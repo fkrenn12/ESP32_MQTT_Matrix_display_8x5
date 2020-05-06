@@ -142,7 +142,7 @@ void serialcommands_handler(void)
                vTaskEnterCritical(&Mutex);
               ssid              = _ssid;
               password          = _pass;
-               vTaskExitCritical(&Mutex);
+              vTaskExitCritical(&Mutex);
 
               // Serial.printf("SSID: %s PASS: %s",_ssid.c_str(),_pass.c_str());
               
