@@ -33,14 +33,15 @@ const char  password[]  = "wiesengrund14"; //Enter Password
 */
 // --------> MQTT-Broker settings <---------------
 
+/*
 String mqttIP    = "94.16.117.246"; 
 String mqttUser  = "labor";
 String mqttPass  = "labor"; 
-/*
+*/
 String mqttIP           = "91.132.147.143"; 
 String mqttUser         = "franz";
 String mqttPass         = "FK_s10rr6fr"; 
-*/
+
 int mqttPort            = 1883;
 // -----------------------------------------
 // global
