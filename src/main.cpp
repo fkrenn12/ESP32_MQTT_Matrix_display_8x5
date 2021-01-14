@@ -33,15 +33,15 @@ const char  password[]  = "wiesengrund14"; //Enter Password
 */
 // --------> MQTT-Broker settings <---------------
 
-/*
+
 String mqttIP    = "94.16.117.246"; 
 String mqttUser  = "labor";
 String mqttPass  = "labor"; 
-*/
+/*
 String mqttIP           = "91.132.147.143"; 
 String mqttUser         = "franz";
 String mqttPass         = "FK_s10rr6fr"; 
-
+*/
 int mqttPort            = 1883;
 // -----------------------------------------
 // global
@@ -185,6 +185,7 @@ void serialReceived( void )
   if (Serial.available()>0)
   {
     byte in = Serial.read();
+
     if ((in == 0x0A) || (in == 0x0D))// || (in == 0x00))
     {
       //----------------
@@ -266,10 +267,8 @@ void setup()
     tft.setTextSize(3);
     tft.setCursor(20,50);
     tft.println("RESET");
-  
-
     
-   
+ 
     tft.setTextSize(3);
     EEPROM.begin(10);
     Serial.begin(BAUDRATE,SERIAL_8N1);
@@ -282,7 +281,7 @@ void setup()
     do{vTaskDelay(10/portTICK_PERIOD_MS);}while(!connected);
     
     configTzTime(TZ_INFO, NTP_SERVER); // ESP32 Systemzeit mit NTP Synchronisieren
-    getLocalTime(&local, 10000);      // Versuche 10 s zu Synchronisieren
+    getLocalTime(&local, 10000);      // Versuche 10 s lang zu Synchronisieren
 
     /*
     tft.printf("%02d:%02d:%02d\r",local.tm_hour,local.tm_min,local.tm_sec);
