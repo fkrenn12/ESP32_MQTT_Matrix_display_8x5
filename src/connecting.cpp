@@ -9,7 +9,6 @@ extern int mqttPort;
 extern String mqttUser;
 extern String mqttPass; 
 extern portMUX_TYPE Mutex;
-extern TFT_eSPI tft;
 extern PubSubClient client;
 extern char chipid_str[13];
 extern void messageReceived(char*, byte*, unsigned int);
@@ -45,27 +44,17 @@ void connectTask( void * pvParameters ) // Connecting to Wifi and MQTT-Broker
     vTaskExitCritical(&Mutex);
     // Wifi
     WiFi.begin(_ssid, _pass);
-    tft.fillScreen(TFT_RED);
-    tft.setTextColor(TFT_BLACK, TFT_RED); // Set the font colour AND the background colour
-    tft.setTextSize(2);
-    tft.setCursor(0, 0); // Set cursor at top left of screen
-    tft.print("Wifi connect to:\nSSID: ");
-    tft.println(_ssid);
-    tft.println("PASS: ----------");
     do
     {
       vTaskDelay(10/ portTICK_PERIOD_MS);
       switch (state)
       {
         case 0://
-                if (WiFi.status() == WL_CONNECTED)  
+              if (WiFi.status() == WL_CONNECTED)  
                 state = 1; 
               timer++;
-              if (timer % 100 == 0) tft.print(".");
               if (timer > 1000) 
               {
-                tft.println("\nNot connnected!");
-                tft.println("Check Wifi\ncredential!");
                 connected = false;
                 vTaskDelay(2000/ portTICK_PERIOD_MS);
                 state = 4;
@@ -74,9 +63,6 @@ void connectTask( void * pvParameters ) // Connecting to Wifi and MQTT-Broker
         case 1://
                   client.setServer(_broker_ip, _broker_port);
                   client.setCallback(messageReceived);
-                  tft.println("Connect MQTT:");
-                  //tft.println(_broker_ip);
-                  //tft.println(chipid_str);
                   timer = 0;
                   state = 2;
               break;
@@ -90,19 +76,13 @@ void connectTask( void * pvParameters ) // Connecting to Wifi and MQTT-Broker
               timer++;
               if (timer > 5) 
               {
-                tft.println("\nNot connnected!");
-                tft.println("Check Broker\nsettings!");
                 vTaskDelay(2000/ portTICK_PERIOD_MS);
                 connected = false;
                 state = 4;
               } 
               break;
         case 3://
-              tft.println("\nConnected!");
-              tft.fillScreen(TFT_BLACK);
-              tft.setTextColor(TFT_YELLOW, TFT_BLACK); // Set the font colour AND the background colour
               vTaskDelay(500/ portTICK_PERIOD_MS);
-              tft.fillScreen(TFT_BLACK);
               connected = true;
               state = 4;
               break;
