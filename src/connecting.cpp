@@ -70,7 +70,8 @@ void connectTask( void * pvParameters ) // Connecting to Wifi and MQTT-Broker
                 client.setServer(_broker_ip, _broker_port);
                 if (client.connect(chipid_str, _broker_user, _broker_pass)) // this function blocks a long time
                 {
-                  //client.subscribe("/dummy"); // dummy subscription
+                  // client.subscribe("/dummy"); // dummy subscription
+                  client.subscribe("labor/#");
                   state = 3;          
                 }
               timer++;

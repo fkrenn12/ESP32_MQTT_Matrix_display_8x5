@@ -4,6 +4,7 @@
 #include <DNSServer.h> 
 #include <WiFiManager.h>   // WiFi Configuration Magic (  https://github.com/zhouhan0126/DNSServer---esp32  ) >>  https://github.com/zhouhan0126/DNSServer---esp32  (ORIGINAL)
 #include <PubSubClient.h> // MQTT Library
+#include <MQTT.h>
 #include "SPI.h"
 #include "connecting.h"
 #include <EEPROM.h>
@@ -67,10 +68,10 @@ String  password        = "wiesengrund14";  //Enter Password
 
 
 String mqttIP    = "94.16.117.246"; 
-String mqttUser  = "labor";
-String mqttPass  = "labor"; 
+String mqttUser  = "franzi";
+String mqttPass  = "franzi"; 
 
-int mqttPort            = 1883;
+int mqttPort            = 8883;
 // -----------------------------------------
 // global
 // -----------------------------------------
@@ -85,16 +86,18 @@ uint64_t chipid;
 char chipid_str[13];    // 6 Bytes = 12 Chars + \0x00 = 13 Chars
 //char topic[256];      // char buffer for topic used several times in code
 
-WiFiClient            net;
-PubSubClient          client(net);
+// WiFiClient            net;
+WiFiClientSecure      netsec;
+MQTTClient            client;
+
 TaskHandle_t          xHandle = NULL;
 // prototypes
-void messageReceived(char*, byte*, unsigned int);
+void messageReceived(String &topic, String &payload) ;
 void configModeCallback (WiFiManager *myWiFiManager);
 void saveConfigCallback (void);
 
 //-------------------------------------------------------------------
-void messageReceived(char* topic, byte* payload, unsigned int length) 
+void messageReceived(String &topic, String &payload) 
 //-------------------------------------------------------------------
 {
   // converting topic and payload to String objects
@@ -102,26 +105,55 @@ void messageReceived(char* topic, byte* payload, unsigned int length)
   // Link to the stringobject documentation
   // https://www.arduino.cc/reference/en/language/variables/data-types/stringobject/
   // static int counter = 0;
-  String str_topic(topic);  
-  char char_payload[100];
-  // copy the every byte to char array
-  for (int i = 0; i < length;i++)
-    char_payload[i] = (char)payload[i];
-  char_payload[length] = 0x00; // ohh, don't forget this ! termination 
-  String str_payload(char_payload);
+
   // Printing out received data on serial port
   Serial.print("Received [");
-  Serial.print(str_topic);
+  Serial.print(topic);
   Serial.print("] ");
-  Serial.print(str_payload);
-
+  Serial.println(payload);
+  bool handled = false;
+  if (topic.lastIndexOf("cmd/?") >= 0)
+  {
+    topic.replace("cmd/?","");
+    Serial.println(topic);
+    client.publish(topic + "rep/ESP32 R4 V1.0.0/accessnumber","0000");
+    return;
+  }
+  else if (topic.lastIndexOf("cmd/rel/1") >= 0)
+  {
+    payload.toLowerCase();
+    if ( payload.lastIndexOf("on") >= 0 || payload.lastIndexOf("1") >= 0) 
+    {
+      Serial.println("Relais 1 ON");
+      handled = true;
+    }
+    if ( payload.lastIndexOf("off") >= 0 || payload.lastIndexOf("0") >= 0)   
+    {
+      Serial.println("Relais 1 OFF");
+      handled = true;
+    }
+  }
+  topic.replace("cmd","rep");
+  if (handled)
+  {
+      Serial.println("HANDLED");
+      Serial.println(topic);
+      client.publish(topic,"ACCEPTED");
+  }
+  else
+  {
+      Serial.println("NOT HANDLED");
+      client.publish(topic,"ERROR");
+  }
 }
 //--------------------------------------------
 void setup() 
 //--------------------------------------------
 { 
+  
     String mqttConfigStr;
     // reading the config from eeprom
+    
     EEPROM.begin(255);
     mqttConfigStr = EEPROM.readString(0);
     // check if valid string
@@ -158,10 +190,22 @@ void setup()
     if (WiFi.isConnected())
     {
       Serial.println("OHHH CONNECTED");
-      WiFi.disconnect();
+      //WiFi.disconnect();
     }
-    WiFi.disconnect();
-    
+       
+    Serial.println("Connect to Broker");
+    client.begin("94.16.117.246" , 8883, netsec);
+    client.onMessage(messageReceived);
+    while (!client.connect("uuuhuh","franz","franz"))
+    {
+      Serial.print("*");
+      delay(1000);
+    }
+    Serial.println("Connected!!");
+    // client.subscribe("/labor");
+    client.subscribe("maqlab/+/+/cmd/#");
+    client.subscribe("maqlab/+/cmd/#");
+    // client.publish("maqlab/hello","WOW");
     
     //wifiManager.autoConnect("ESP_AP", "12345678"); 
 
@@ -173,18 +217,20 @@ void setup()
     
 
 
-    #ifndef DEBUG
-    Serial.setDebugOutput(false);
-    #endif
-    Serial.print("Testing serial");
-    Serial.println(chipid_str);
+    // #ifndef DEBUG
+    // Serial.setDebugOutput(false);
+    // #endif
+    // Serial.print("Testing serial");
+    // Serial.println(chipid_str);
 
     // Connect to wifi and Broker
-    xTaskCreate( connectTask, "CONNECTOR", 4096, &ucParameterToPass, tskIDLE_PRIORITY, &xHandle);
-    //configASSERT( xHandle );
-    do{vTaskDelay(10/portTICK_PERIOD_MS);}while(!connected);
-    Serial.print("Connected");
-    client.publish("labor/test","Hallo");
+    // xTaskCreate( connectTask, "CONNECTOR", 4096, &ucParameterToPass, tskIDLE_PRIORITY, &xHandle);
+    // configASSERT( xHandle );
+    // do{vTaskDelay(10/portTICK_PERIOD_MS);}while(!connected);
+    // Serial.print("Connected");
+    // client.subscribe("/labor/#");
+    // client.publish("/labor/test","Hallo");
+
     configTzTime(TZ_INFO, NTP_SERVER); // ESP32 Systemzeit mit NTP Synchronisieren
     getLocalTime(&local, 10000);      // Versuche 10 s lang zu Synchronisieren
     
@@ -196,8 +242,8 @@ void loop()
 {    
   static int counter = 0;
   
-  /*
   client.loop(); // must be called periodically to get incomming messages from MQTT-Broker
+  /*
   // delay(10);  // <- fixes some issues with WiFi stability - only if neccessary
   if (!client.connected() || needReconnect) // check connection status continously
   {
@@ -215,8 +261,8 @@ void loop()
     return;
   }
   */
-  Serial.println(counter++);
-  delay(100);
+  // Serial.println(counter++);
+  delay(10);
 }
 //callback que indica que o ESP entrou no modo AP
 void configModeCallback (WiFiManager *myWiFiManager) 
