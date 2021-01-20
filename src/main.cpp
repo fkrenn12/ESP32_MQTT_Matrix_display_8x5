@@ -1,3 +1,7 @@
+#define versionNumber "1.0.0"
+#define deviceName "ESP32 R4"
+#define configPreamble "Qa9dBMx"
+
 //#include <WiFi.h>      //ESP32 Core WiFi Library 
 #include <WiFiClientSecure.h>
 #include <WebServer.h> 
@@ -35,19 +39,8 @@ String getValue(String data, char separator, int index)
     }
     return found > index ? data.substring(strIndex[0], strIndex[1]) : "";
 }
-#define versionNumber "1.0.0"
-#define deviceName "ESP32 R4"
-#define configPreamble "Qa9dBMx"
-String deviceNameFull;  
-char mqtt_server[20];
-char mqtt_port[6] = "1883";
-char mqtt_user[20] = "user";
-char mqtt_pass[20] = "password";
 
-const int relay1      = 14;   // IO14 Pin for Relay1 using the Relay Shield by Seed Studio
-const int relay2      = 27;   // IO27 Pin for Relay2 using the Relay Shield by Seed Studio
-const int relay3      = 16;   // IO16 Pin for Relay3 using the Relay Shield by Seed Studio
-const int relay4      = 17;   // IO17 Pin for Relay4 using the Relay Shield by Seed Studio
+
 
 // char blynk_token[34] = "";
 // The extra parameters to be configured (can be either global or just in the setup)
@@ -74,10 +67,21 @@ String  password        = "wiesengrund14";  //Enter Password
 
 // --------> MQTT-Broker settings <---------------
 
+String deviceNameFull;  
+char mqtt_server[20];
+char mqtt_port[6] = "1883";
+char mqtt_user[20] = "user";
+char mqtt_pass[20] = "password";
 
-String mqttIP    = "94.16.117.246"; 
-String mqttUser  = "maqlab"; // franz
-String mqttPass  = "maqlab"; // franz
+const int relay1      = 14;   // IO14 Pin for Relay1 using the Relay Shield by Seed Studio
+const int relay2      = 27;   // IO27 Pin for Relay2 using the Relay Shield by Seed Studio
+const int relay3      = 16;   // IO16 Pin for Relay3 using the Relay Shield by Seed Studio
+const int relay4      = 17;   // IO17 Pin for Relay4 using the Relay Shield by Seed Studio
+
+String mqtt_hostname    = "techfit.at"; 
+String mqttIP           = ""; 
+String mqttUser         = "maqlab"; // franz
+String mqttPass         = "maqlab"; // franz
 
 int mqttPort     = 1883; //8883
 int accessnumber = 0000;
@@ -240,8 +244,7 @@ void setup()
     Serial.println(chipid_str);
     Serial.println(deviceNameFull);
     String mqttConfigStr;
-    // reading the config from eeprom
-    
+    // TODO: reading the config from eeprom
     EEPROM.begin(255);
     mqttConfigStr = EEPROM.readString(0);
     // check if valid string
@@ -252,7 +255,7 @@ void setup()
     WiFiManager wifiManager;
     wifiManager.setConfigPortalTimeout(10);
     wifiManager.setConnectTimeout(1);
-    WiFiManagerParameter custom_mqtt_server("server", "mqtt server", mqtt_server, 40);
+    WiFiManagerParameter custom_mqtt_server("server", "mqtt server", mqtt_server , 40);
     WiFiManagerParameter custom_mqtt_port("port", "mqtt port", mqtt_port, 6);
     wifiManager.addParameter(&custom_mqtt_server);
     wifiManager.addParameter(&custom_mqtt_port);
@@ -274,6 +277,8 @@ void setup()
     //read updated parameters
     //strcpy(mqtt_server, custom_mqtt_server.getValue());
     //strcpy(mqtt_port, custom_mqtt_port.getValue());
+    String mqtt_hostname = custom_mqtt_server.getValue();
+    
     Serial.print("MQTT_SERVER:");
     Serial.println(mqtt_server);
     Serial.print("MQTT_PORT:");
@@ -284,9 +289,10 @@ void setup()
       delay(2000);
       ESP.restart();
     }
-    WiFi.enableAP(false);
+    WiFi.enableAP(false);   // remove the AP from the network
     Serial.println("WiFi Connected !!");
-
+    // get host ip from host name
+    // WiFi.hostByName(mhostname, mserver);
     Serial.println("Connecting to Broker");
     client.begin("94.16.117.246" , 8883, netsec);
     client.onMessage(messageReceived);
