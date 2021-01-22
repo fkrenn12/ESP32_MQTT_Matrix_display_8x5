@@ -2,10 +2,12 @@
     Target: ESP32
 */
 // -------------------------------------------------------------------------------------------
-#define DEBUG           0
-#define versionNumber   "1.0.0"
-#define deviceName      "ESP32 R4"
-#define BAUDRATE        9600
+#define FORCE_CONFIG_PORTAL   0
+#define DEBUG                 0
+#define versionNumber         "1.0.0"
+#define deviceName            "ESP32 R4"
+#define BAUDRATE              9600
+
 // ------------> Time Server settings <------------------
 #define NTP_SERVER "de.pool.ntp.org"
 #define TZ_INFO "WEST-1DWEST-2,M3.5.0/02:00:00,M10.5.0/03:00:00" // Western European Time
@@ -24,11 +26,13 @@
 #define pin3 25
 #define pin8 12
 #define pin9 13
+#define pin13 18
 // definitions of relay port pins ( relay shield )
 #define relay1 14
 #define relay2 27
 #define relay3 16
 #define relay4 17
+
 // definition of eeprom address
 #define eeprom_addr_relay_state   0
 #define eeprom_addr_mqtt_server   eeprom_addr_relay_state + 4
@@ -38,30 +42,35 @@
 #define eeprom_addr_chipid        eeprom_addr_mqtt_pass   + 32
 #define eeprom_addr_WiFi_SSID     eeprom_addr_chipid      + 32
 #define eeprom_addr_WiFi_pass     eeprom_addr_WiFi_SSID   + 32
+#define eeprom_addr_mqtt_root     eeprom_addr_WiFi_pass   + 32
 
 #define led_green pin2
 #define led_red   pin3
+#define digital_input pin13
 
 // -----------------------------------------
 //            global variables
 // -----------------------------------------
 // default values
-char szt_mqtt_hostname[32]  = "mqtt-broker.com";
+char szt_mqtt_hostname[32]  = "mqtt-host";
 char szt_mqtt_ip[32]        = "0.0.0.0";
-char szt_mqtt_port[10]      = "8883";
-char szt_mqtt_user[32]      = "username";
-char szt_mqtt_pass[32]      = "password";
+char szt_mqtt_port[10]      = "mqtt-port";
+char szt_mqtt_user[32]      = "mqtt-username";
+char szt_mqtt_pass[32]      = "mqtt-password";
+char szt_mqtt_root[32]      = "mqtt-root";
 
-String wifi_ssid        = "";
-String wifi_password    = "";
-String mqtt_hostname    = "techfit.at"; 
-String mqtt_port        = "";
-String mqtt_user        = "maqlab"; 
-String mqtt_password    = "maqlab"; 
+String wifi_ssid            = "";
+String wifi_password        = "";
+String mqtt_hostname        = ""; 
+String mqtt_port            = "";
+String mqtt_user            = ""; 
+String mqtt_password        = ""; 
+String mqtt_root            = "";
 
-String deviceNameFull;  
+String deviceNameFull;
+String topic_root = mqtt_root + "/";  
 
-int accessnumber = 0000;
+unsigned int accessnumber = 0;
 
 boolean needReconnect = false;
 
@@ -75,10 +84,58 @@ char chipid_str[13];    // 6 Bytes = 12 Chars + \0x00 = 13 Chars
 WiFiClientSecure      netsec;
 MQTTClient            client;
 // prototypes
-void messageReceived(String &topic, String &payload) ;
+void messageReceived(String &topic, String &payload);
+//bool connecting_to_Wifi_and_broker();
 void configModeCallback (WiFiManager *myWiFiManager);
 void saveConfigCallback (void);
 
+//-------------------------------------------------------------------
+bool connecting_to_Wifi_and_broker()
+//-------------------------------------------------------------------
+{
+  int counter = 0;
+  Serial.print("WiFi Connecting.");
+  while(!WiFi.isConnected())
+  {
+    Serial.print(".");
+    digitalWrite(led_red, 1);
+    delay(500);
+    digitalWrite(led_red, 0);
+    delay(500);
+  }
+  Serial.println("connected !!");
+  // get host ip from host name
+  Serial.println("Resolve ip adress from hostname: " + mqtt_hostname);
+  IPAddress mqtt_host_ip;
+  
+  counter = 0;
+  while (WiFi.hostByName(mqtt_hostname.c_str(), mqtt_host_ip) != 1)
+  {
+    Serial.print(".");
+    digitalWrite(led_red, 1);
+    delay(500);
+    digitalWrite(led_red, 0);
+    delay(500);
+    if (++counter > 10) break;
+  }
+  Serial.println("IP-Address: " + mqtt_host_ip.toString());  
+  Serial.print("Connecting to broker.");
+  client.begin(mqtt_host_ip.toString().c_str(), mqtt_port.toInt(), netsec);
+  client.onMessage(messageReceived);
+
+  counter = 0;
+  while (!client.connect(chipid_str,mqtt_user.c_str(),mqtt_password.c_str()))
+  {
+    Serial.print("*");
+    digitalWrite(led_red, 1);
+    delay(500);
+    digitalWrite(led_red, 0);
+    delay(500);
+    if (++counter > 10) break;
+  }
+  if (counter > 10) return false;
+  return(true);
+}
 //-------------------------------------------------------------------
 void messageReceived(String &topic, String &payload) 
 //-------------------------------------------------------------------
@@ -105,7 +162,7 @@ void messageReceived(String &topic, String &payload)
   // matching accessnumber?
   String access;
   access = "cmd/";
-  access.concat(String(accessnumber)); // hier fehlt noch das Umwandeln des int Wertes
+  access.concat(String(accessnumber)); 
   access.concat("/");  
 
   if (topic.lastIndexOf(access) < 0)
@@ -115,9 +172,37 @@ void messageReceived(String &topic, String &payload)
     // nothing to do !!
     return;
   }
+
+  topic.replace("cmd","rep");
+  if (topic.lastIndexOf("/echo") >= 0)
+  {
+      client.publish(topic,payload);
+      return;
+  }
+  else if (topic.lastIndexOf("rel/1/?") >= 0)
+  {
+    client.publish(topic,String(digitalRead(relay1)));
+    return;
+  }
+  else if (topic.lastIndexOf("rel/2/?") >= 0)
+  {
+    client.publish(topic,String(digitalRead(relay2)));
+    return;
+  }
+  else if (topic.lastIndexOf("rel/3/?") >= 0)
+  {
+    client.publish(topic,String(digitalRead(relay3)));
+    return;
+  }
+  else if (topic.lastIndexOf("rel/4/?") >= 0)
+  {
+    client.publish(topic,String(digitalRead(relay4)));
+    return;
+  }
   else if (topic.lastIndexOf("rel/1") >= 0)
   {
     payload.toLowerCase();
+    
     if ( payload.lastIndexOf("on") >= 0 || payload.lastIndexOf("1") >= 0) 
     {
       Serial.println("Relais 1 ON");
@@ -187,8 +272,7 @@ void messageReceived(String &topic, String &payload)
       handled = true;
     }
   }
- 
-  topic.replace("cmd","rep");
+
   if (handled)
   {
       Serial.println("HANDLED");
@@ -200,19 +284,42 @@ void messageReceived(String &topic, String &payload)
   {
       Serial.println("NOT HANDLED");
       client.publish(topic,"ERROR");
+      return;
   }
+  String _topic    = topic_root + "rep/" + String(accessnumber); 
+  String _payload  = "{'status':{'rel':{'1':'{{REL1}}', '2':'{{REL2}}', '3':'{{REL3}}', '4':'{{REL4}}'}}}";
+  _payload.replace("{{REL1}}", String(digitalRead(relay1)));
+  _payload.replace("{{REL2}}", String(digitalRead(relay2)));
+  _payload.replace("{{REL3}}", String(digitalRead(relay3)));
+  _payload.replace("{{REL4}}", String(digitalRead(relay4)));
+  client.publish(_topic, _payload);
 }
 //--------------------------------------------
 void setup() 
 //--------------------------------------------
 {   
+    bool needConfigPortal = false;
+    pinMode(digital_input,INPUT_PULLUP);
+    delay(10);
+    while(!(bool)digitalRead(digital_input))
+      needConfigPortal = true;
+    
     deviceNameFull = deviceName;
     deviceNameFull.concat(" V");
     deviceNameFull.concat(versionNumber);
-  
     chipid=ESP.getEfuseMac(); //The chip ID is essentially its MAC address(length: 6 bytes).
-    accessnumber = (int)(chipid % 1000) + 8000;
+
+    accessnumber = ((unsigned int)chipid % 1000) + 8000;
+    accessnumber = (uint16_t)(chipid>>32);
+    accessnumber %= 1000;
+    accessnumber += 8000;
     sprintf(chipid_str,"%04X%08X",(uint16_t)(chipid>>32),(uint32_t)chipid);
+
+    Serial.begin(BAUDRATE,SERIAL_8N1);
+    Serial.println("\n*** STARTUP after RESET ***");
+    Serial.println("Devicename: " + deviceNameFull);
+    Serial.println("ChipId: " + String(chipid_str));
+    Serial.println("Acessnumber: " + String(accessnumber));
     // configure led pins
     pinMode(led_green, OUTPUT);
     pinMode(led_red, OUTPUT);
@@ -228,25 +335,22 @@ void setup()
     digitalWrite(relay2,0);
     digitalWrite(relay3,0);
     digitalWrite(relay4,0);
-
-    Serial.begin(BAUDRATE,SERIAL_8N1);
-    Serial.println("\n*** STARTUP after RESET ***");
-    Serial.println((unsigned int)chipid % 1000);
-    Serial.println(deviceNameFull);
-    // TODO: reading the config from eeprom
+   
+    // reading the config from eeprom
     EEPROM.begin(255);
     String wifi_ssid      = "";
     String wifi_password  = "";
+
     if (EEPROM.readByte(eeprom_addr_WiFi_SSID) == 0xaa) 
       wifi_ssid        = EEPROM.readString(eeprom_addr_WiFi_SSID+1);
     if (EEPROM.readByte(eeprom_addr_WiFi_pass) == 0xaa) 
       wifi_password    = EEPROM.readString(eeprom_addr_WiFi_pass+1);
 
-    String mqtt_hostname    = EEPROM.readString(eeprom_addr_mqtt_server+1);
-    String mqtt_ip          = ""; 
-    String mqtt_port        = EEPROM.readString(eeprom_addr_mqtt_port+1);
-    String mqtt_user        = EEPROM.readString(eeprom_addr_mqtt_user+1);
-    String mqtt_password    = EEPROM.readString(eeprom_addr_mqtt_pass+1);
+    mqtt_hostname    = EEPROM.readString(eeprom_addr_mqtt_server+1);
+    mqtt_port        = EEPROM.readString(eeprom_addr_mqtt_port+1);
+    mqtt_user        = EEPROM.readString(eeprom_addr_mqtt_user+1);
+    mqtt_password    = EEPROM.readString(eeprom_addr_mqtt_pass+1);
+    mqtt_root        = EEPROM.readString(eeprom_addr_mqtt_root+1);
 
     if (EEPROM.readByte(eeprom_addr_mqtt_server) == 0xaa) 
       mqtt_hostname.toCharArray(szt_mqtt_hostname,30);
@@ -256,15 +360,19 @@ void setup()
       mqtt_password.toCharArray(szt_mqtt_pass,30);
     if (EEPROM.readByte(eeprom_addr_mqtt_user) == 0xaa) 
       mqtt_user.toCharArray(szt_mqtt_user,30);
+    if (EEPROM.readByte(eeprom_addr_mqtt_root) == 0xaa) 
+      mqtt_user.toCharArray(szt_mqtt_root,30);
     
-    Serial.print("MQTT-HOSTNAME:");
+    Serial.print("MQTT-HOST: ");
     Serial.println(szt_mqtt_hostname);
-    Serial.print("MQTT-PORT:");
+    Serial.print("MQTT-PORT: ");
     Serial.println(szt_mqtt_port);
-    Serial.print("MQTT-USER:");
+    Serial.print("MQTT-USER: ");
     Serial.println(szt_mqtt_user);
-    Serial.print("MQTT-PASSWD:");
+    Serial.print("MQTT-PASSWD: ");
     Serial.println(szt_mqtt_pass);
+    Serial.print("MQTT-ROOT: ");
+    Serial.println(szt_mqtt_root);
 
     // reading the saved relay states and switch the relays to the saved state
     for (int i=0; i < 4; i++)
@@ -286,97 +394,60 @@ void setup()
         default: break;
       }
     }
-    WiFi.mode(WIFI_STA);
-    Serial.println(wifi_ssid.c_str());
-    bool needConfigPortal = (wifi_ssid=="");
-    if (!needConfigPortal)
-    {
-      // try to connect to Wifi
-      WiFi.begin( wifi_ssid.c_str(), wifi_password.c_str());
-      int counter = 0;
-      Serial.print("Connect to Wifi");
-      while(!WiFi.isConnected())
-      {
-        delay(1000);
-        Serial.print(".");
 
-        if (++counter > 10) break;
-      }
-      Serial.println("Connected!!");
-      IPAddress mqtt_host_ip;
-      needConfigPortal = (WiFi.hostByName(mqtt_hostname.c_str(), mqtt_host_ip) != 1);
-      needConfigPortal |= (!WiFi.isConnected());
-    }
-    if (needConfigPortal)
-      Serial.println("NEED CONFIGPORTAL");
-    else
-      Serial.println("NOT NEEDED CONFIGPORTAL");
-
-    // EEPROM.writeString(eeprom_addr_WiFi_SSID,"hallo");
-    // EEPROM.commit();
-    
-    // EEPROM.writeByte(0,0xa1);
-    // EEPROM.commit();
-    if (needConfigPortal)
-    {
-      digitalWrite(led_red, 1);
-      WiFiManager wifiManager;
-      wifiManager.setCustomHeadElement("<style>html{filter: invert(100%); -webkit-filter: invert(100%);}</style>");
-      wifiManager.setConnectTimeout(5);
-      wifiManager.setConfigPortalTimeout(200);
-      WiFiManagerParameter custom_mqtt_server("server", "mqtt server", szt_mqtt_hostname , 30);
-      WiFiManagerParameter custom_mqtt_port("port", "mqtt port", szt_mqtt_port, 8);
-      WiFiManagerParameter custom_mqtt_username("user", "mqtt user", szt_mqtt_user , 30);
-      WiFiManagerParameter custom_mqtt_password("pass", "mqtt pass", szt_mqtt_pass, 30);
-      wifiManager.addParameter(&custom_mqtt_server);
-      wifiManager.addParameter(&custom_mqtt_port);
-      wifiManager.addParameter(&custom_mqtt_username);
-      wifiManager.addParameter(&custom_mqtt_password);
-      // wifiManager.resetSettings();
-      // ESP.restart();
-      wifiManager.setAPCallback(configModeCallback); 
-      wifiManager.setSaveConfigCallback(saveConfigCallback); 
-      wifiManager.startConfigPortal();
-      // wifiManager.autoConnect("MQTT 4 RELAY Config", "12345678"); 
-      // wifiManager.autoConnect(); 
+    do
+    {    
+      WiFi.mode(WIFI_STA);
+      Serial.println("WiFi-SSID: " + wifi_ssid);
+      #if (FORCE_CONFIG_PORTAL == 1)
+        needConfigPortal = true;
+      #endif
       
-      Serial.println(wifiManager.getSSID()); //imprime o SSID criado da rede</p><p>}</p><p>//callback que indica que salvamos uma nova rede para se conectar (modo estação)
-      Serial.println(wifiManager.getPassword());
-      wifi_ssid      = wifiManager.getSSID();
-      wifi_password  = wifiManager.getPassword();
-      //read updated parameters
-      //strcpy(mqtt_server, custom_mqtt_server.getValue());
-      //strcpy(mqtt_port, custom_mqtt_port.getValue());
-      mqtt_hostname = custom_mqtt_server.getValue();
-      mqtt_port     = custom_mqtt_port.getValue();
-      mqtt_user     = custom_mqtt_username.getValue();
-      mqtt_password = custom_mqtt_password.getValue();
+      if (needConfigPortal)
+        Serial.println("*** NEED CONFIG-PORTAL ***");
+      else
+        Serial.println("*** CONFIG-PORTAL NOT NEEDED ***");
 
-      digitalWrite(led_red, 0);
+      if (needConfigPortal)
+      {
+        digitalWrite(led_red, 1);
+        WiFiManager wifiManager;
+        wifiManager.setCustomHeadElement("<style>html{filter: invert(100%); -webkit-filter: invert(100%);}</style>");
+        wifiManager.setConnectTimeout(5);
+        wifiManager.setConfigPortalTimeout(500);
+        WiFiManagerParameter custom_mqtt_server("server", "mqtt server", szt_mqtt_hostname , 30);
+        WiFiManagerParameter custom_mqtt_port("port", "mqtt port", szt_mqtt_port, 8);
+        WiFiManagerParameter custom_mqtt_username("user", "mqtt user", szt_mqtt_user , 30);
+        WiFiManagerParameter custom_mqtt_password("pass", "mqtt pass", szt_mqtt_pass, 30);
+        WiFiManagerParameter custom_mqtt_root("root", "mqtt root", szt_mqtt_root, 30);
+        wifiManager.addParameter(&custom_mqtt_server);
+        wifiManager.addParameter(&custom_mqtt_port);
+        wifiManager.addParameter(&custom_mqtt_username);
+        wifiManager.addParameter(&custom_mqtt_password);
+        wifiManager.addParameter(&custom_mqtt_root);
+        wifiManager.setAPCallback(configModeCallback); 
+        wifiManager.setSaveConfigCallback(saveConfigCallback); 
+        wifiManager.startConfigPortal();
+        //read updated parameters
+        wifi_ssid      = wifiManager.getSSID();
+        wifi_password  = wifiManager.getPassword();
+        mqtt_hostname = custom_mqtt_server.getValue();
+        mqtt_port     = custom_mqtt_port.getValue();
+        mqtt_user     = custom_mqtt_username.getValue();
+        mqtt_password = custom_mqtt_password.getValue();
+        mqtt_root     = custom_mqtt_root.getValue();
+        digitalWrite(led_red, 0);
+        WiFi.enableAP(false);   // remove the AP from the network
+      }
+      else
+      {
+        WiFi.begin(wifi_ssid.c_str(),wifi_password.c_str());
+      }
     }
-    WiFi.enableAP(false);   // remove the AP from the network
-    if (!WiFi.isConnected())
-    {
-      ESP.restart();
-    }
-    Serial.println("WiFi Connected !!");
-    // get host ip from host name
-    IPAddress mqtt_host_ip;
-    if (WiFi.hostByName(mqtt_hostname.c_str(), mqtt_host_ip) != 1)
-      ESP.restart();
+    while (!connecting_to_Wifi_and_broker());
 
-    Serial.println(mqtt_host_ip.toString());
-
-    Serial.println("Connecting to Broker");
-    client.begin(mqtt_host_ip.toString().c_str(), mqtt_port.toInt(), netsec);
-    client.onMessage(messageReceived);
-    while (!client.connect(chipid_str,mqtt_user.c_str(),mqtt_password.c_str()))
-    {
-      Serial.print("*");
-      delay(1000);
-    }
     digitalWrite(led_green,1);
-    Serial.println("Connected!!");
+    Serial.println("connected !!");
     // save wifi and broker credentials to EEPROM
     EEPROM.writeByte(eeprom_addr_WiFi_SSID,0xaa);
     EEPROM.writeString(eeprom_addr_WiFi_SSID+1,wifi_ssid);
@@ -390,16 +461,22 @@ void setup()
     EEPROM.writeString(eeprom_addr_mqtt_server+1,mqtt_hostname);
     EEPROM.writeByte(eeprom_addr_mqtt_port,0xaa);
     EEPROM.writeString(eeprom_addr_mqtt_port+1,mqtt_port);
+    EEPROM.writeByte(eeprom_addr_mqtt_root,0xaa);
+    EEPROM.writeString(eeprom_addr_mqtt_root+1,mqtt_root);
     EEPROM.commit();
 
-    // client.subscribe("/labor");
-    client.subscribe("maqlab/+/+/cmd/#");
-    client.subscribe("maqlab/+/cmd/#");
-    
+
+    topic_root = mqtt_root + "/";
+    client.subscribe(topic_root + "+/+/cmd/#");
+    Serial.println("Subscribed to: " + topic_root + "+/+/cmd/#");
+    client.subscribe(topic_root + "+/cmd/#");
+    Serial.println("Subscribed to: " + topic_root + "+/cmd/#");
+    client.subscribe(topic_root + "cmd/#");
+    Serial.println("Subscribed to: " + topic_root + "cmd/#");
+     
     struct tm local;
     configTzTime(TZ_INFO, NTP_SERVER); // ESP32 Systemzeit mit NTP Synchronisieren
-    getLocalTime(&local, 10000);      // Versuche 10 s lang zu Synchronisieren
-    
+    getLocalTime(&local, 10000);       // Versuche 10 s lang zu Synchronisieren   
 }
 
 //--------------------------------------------
@@ -407,6 +484,7 @@ void loop()
 //--------------------------------------------
 {    
   static int timer_ms = 0;
+  // static int counter = 0;
   client.loop(); // must be called periodically to get incomming messages from MQTT-Broker
   delay(10);  // <- fixes some issues with WiFi stability - only if neccessary
   if (!client.connected() || needReconnect) // check connection status continously
@@ -414,34 +492,24 @@ void loop()
     digitalWrite(led_green,0);
     Serial.println("--> unexpected disconnection <--");
     client.disconnect();
-    Serial.print("WiFi Connecting");
-    while(!WiFi.isConnected())
-    {
-      Serial.print(".");
-      delay(1000);
-    }
-    Serial.println("WiFi connected");
-    Serial.println("Reconnecting to Broker");
-    client.begin("94.16.117.246" , 8883, netsec);
-    client.onMessage(messageReceived);
-    while (!client.connect(chipid_str,"franz","franz"))
-    {
-      Serial.print("*");
-      delay(1000);
-    }
+    while (!connecting_to_Wifi_and_broker()){};
     digitalWrite(led_green,1);
     Serial.println("Connected!!");
     // client.subscribe("/labor");
-    client.subscribe("maqlab/+/+/cmd/#");
-    client.subscribe("maqlab/+/cmd/#");
+    client.subscribe(topic_root + "+/+/cmd/#");
+    client.subscribe(topic_root + "+/cmd/#");
+    client.subscribe(topic_root + "cmd/#");
   }
   if ((millis() - timer_ms) > 1000)
   {
     timer_ms = millis();
-    if (digitalRead(relay1))
-      client.publish("maqlab/1/1/rep","{'status':{'rel1':'1'}}");
-    else
-      client.publish("maqlab/1/1/rep","{'status':{'rel1':'0'}}");
+    String topic    = topic_root + "rep/" + String(accessnumber); 
+    String payload  = "{'status':{'rel':{'1':'{{REL1}}', '2':'{{REL2}}', '3':'{{REL3}}', '4':'{{REL4}}'}}}";
+    payload.replace("{{REL1}}", String(digitalRead(relay1)));
+    payload.replace("{{REL2}}", String(digitalRead(relay2)));
+    payload.replace("{{REL3}}", String(digitalRead(relay3)));
+    payload.replace("{{REL4}}", String(digitalRead(relay4)));
+    client.publish(topic, payload); 
   }
 }
 //callback que indica que o ESP entrou no modo AP
