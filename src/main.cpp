@@ -95,16 +95,23 @@ bool connecting_to_Wifi_and_broker()
 {
   int counter = 0;
   Serial.print("WiFi Connecting.");
+ 
   while(!WiFi.isConnected())
   {
+    digitalWrite(led_green, 1);
+    delay(100);
+    digitalWrite(led_green, 0);
     Serial.print(".");
     digitalWrite(led_red, 1);
     delay(500);
     digitalWrite(led_red, 0);
     delay(500);
+    if (++counter > 10) return(false);
   }
   Serial.println("connected !!");
   // get host ip from host name
+
+  
   Serial.println("Resolve ip adress from hostname: " + mqtt_hostname);
   IPAddress mqtt_host_ip;
   
@@ -116,7 +123,7 @@ bool connecting_to_Wifi_and_broker()
     delay(500);
     digitalWrite(led_red, 0);
     delay(500);
-    if (++counter > 10) break;
+    if (++counter > 10) return(false);
   }
   Serial.println("IP-Address: " + mqtt_host_ip.toString());  
   Serial.print("Connecting to broker.");
@@ -131,9 +138,9 @@ bool connecting_to_Wifi_and_broker()
     delay(500);
     digitalWrite(led_red, 0);
     delay(500);
-    if (++counter > 10) break;
+    counter++;
+    if (++counter > 10) return(false);
   }
-  if (counter > 10) return false;
   return(true);
 }
 //-------------------------------------------------------------------
@@ -338,8 +345,8 @@ void setup()
    
     // reading the config from eeprom
     EEPROM.begin(255);
-    String wifi_ssid      = "";
-    String wifi_password  = "";
+    wifi_ssid = "";
+    wifi_password  = "";
 
     if (EEPROM.readByte(eeprom_addr_WiFi_SSID) == 0xaa) 
       wifi_ssid        = EEPROM.readString(eeprom_addr_WiFi_SSID+1);
@@ -393,11 +400,16 @@ void setup()
         case 9: digitalWrite(relay4,1); break;
         default: break;
       }
+      delay(50);
     }
 
     do
     {    
+      client.disconnect();
+      WiFi.disconnect();
+      WiFi.mode(WIFI_OFF);
       WiFi.mode(WIFI_STA);
+      WiFi.enableSTA(true);
       Serial.println("WiFi-SSID: " + wifi_ssid);
       #if (FORCE_CONFIG_PORTAL == 1)
         needConfigPortal = true;
@@ -491,11 +503,19 @@ void loop()
   {
     digitalWrite(led_green,0);
     Serial.println("--> unexpected disconnection <--");
-    client.disconnect();
-    while (!connecting_to_Wifi_and_broker()){};
+    do
+    {
+      client.disconnect();
+      WiFi.disconnect();
+      WiFi.mode(WIFI_OFF);
+      WiFi.mode(WIFI_STA);
+      WiFi.enableSTA(true);
+      WiFi.begin(wifi_ssid.c_str(),wifi_password.c_str());
+    }
+    while (!connecting_to_Wifi_and_broker());
     digitalWrite(led_green,1);
     Serial.println("Connected!!");
-    // client.subscribe("/labor");
+
     client.subscribe(topic_root + "+/+/cmd/#");
     client.subscribe(topic_root + "+/cmd/#");
     client.subscribe(topic_root + "cmd/#");
