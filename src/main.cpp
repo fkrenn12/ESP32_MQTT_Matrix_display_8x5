@@ -37,7 +37,7 @@
 #define eeprom_addr_relay_state   0
 #define eeprom_addr_mqtt_server   eeprom_addr_relay_state + 4
 #define eeprom_addr_mqtt_port     eeprom_addr_mqtt_server + 32
-#define eeprom_addr_mqtt_user     eeprom_addr_mqtt_port   + 10
+#define eeprom_addr_mqtt_user     eeprom_addr_mqtt_port   + 15
 #define eeprom_addr_mqtt_pass     eeprom_addr_mqtt_user   + 32
 #define eeprom_addr_chipid        eeprom_addr_mqtt_pass   + 32
 #define eeprom_addr_WiFi_SSID     eeprom_addr_chipid      + 32
@@ -54,7 +54,7 @@
 // default values
 char szt_mqtt_hostname[32]  = "mqtt-host";
 char szt_mqtt_ip[32]        = "0.0.0.0";
-char szt_mqtt_port[10]      = "mqtt-port";
+char szt_mqtt_port[15]      = "mqtt-port";
 char szt_mqtt_user[32]      = "mqtt-username";
 char szt_mqtt_pass[32]      = "mqtt-password";
 char szt_mqtt_root[32]      = "mqtt-root";
@@ -424,22 +424,27 @@ void setup()
       {
         digitalWrite(led_red, 1);
         WiFiManager wifiManager;
-        wifiManager.setCustomHeadElement("<style>html{filter: invert(100%); -webkit-filter: invert(100%);}</style>");
+        //wifiManager.setCustomHeadElement("<style>html{filter: invert(100%); -webkit-filter: invert(100%);}</style>");
+        
         wifiManager.setConnectTimeout(5);
         wifiManager.setConfigPortalTimeout(500);
+        String text = "<p><h2>Accessnumber: " + String(accessnumber) + "</h2></p>";
+        WiFiManagerParameter custom_text(text.c_str());
         WiFiManagerParameter custom_mqtt_server("server", "mqtt server", szt_mqtt_hostname , 30);
-        WiFiManagerParameter custom_mqtt_port("port", "mqtt port", szt_mqtt_port, 8);
+        WiFiManagerParameter custom_mqtt_port("port", "mqtt port", szt_mqtt_port, 13);
         WiFiManagerParameter custom_mqtt_username("user", "mqtt user", szt_mqtt_user , 30);
         WiFiManagerParameter custom_mqtt_password("pass", "mqtt pass", szt_mqtt_pass, 30);
         WiFiManagerParameter custom_mqtt_root("root", "mqtt root", szt_mqtt_root, 30);
+        wifiManager.addParameter(&custom_text);
         wifiManager.addParameter(&custom_mqtt_server);
         wifiManager.addParameter(&custom_mqtt_port);
         wifiManager.addParameter(&custom_mqtt_username);
         wifiManager.addParameter(&custom_mqtt_password);
         wifiManager.addParameter(&custom_mqtt_root);
         wifiManager.setAPCallback(configModeCallback); 
-        wifiManager.setSaveConfigCallback(saveConfigCallback); 
-        wifiManager.startConfigPortal();
+        wifiManager.setSaveConfigCallback(saveConfigCallback);
+        String temp_ssid = "ESP" + String(chipid_str); 
+        wifiManager.startConfigPortal(temp_ssid.c_str());
         //read updated parameters
         wifi_ssid      = wifiManager.getSSID();
         wifi_password  = wifiManager.getPassword();
