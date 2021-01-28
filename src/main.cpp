@@ -5,7 +5,9 @@
 #define FORCE_CONFIG_PORTAL   0
 #define DEBUG                 0
 #define versionNumber         "1.0.0"
-#define deviceName            "ESP32 R4"
+#define MODELNAME             "ESP32-R4C"
+#define MANUFACTORER          "HTL-ET"
+#define DEVICETYPE            "RELAY Controller"
 #define BAUDRATE              9600
 
 // ------------> Time Server settings <------------------
@@ -186,22 +188,36 @@ void messageReceived(String &topic, String &payload)
       client.publish(topic,payload);
       return;
   }
-  else if (topic.lastIndexOf("rel/1/?") >= 0)
+  else if (topic.lastIndexOf("/?") >= 0)
+  {
+      topic.replace("?","");
+      String new_topic;
+      new_topic = topic + "commands";
+      client.publish(new_topic,"['rel/1','rel/2','rel/3','rel/4','rel/1?','rel/2?','rel/3?','rel/4?']");
+      new_topic = topic + "manufactorer";
+      client.publish(new_topic,MANUFACTORER);
+      new_topic = topic + "model";
+      client.publish(new_topic,MODELNAME);
+      new_topic = topic + "devicetype";
+      client.publish(new_topic,DEVICETYPE);
+      return;
+  }
+  else if (topic.lastIndexOf("rel/1?") >= 0)
   {
     client.publish(topic,String(digitalRead(relay1)));
     return;
   }
-  else if (topic.lastIndexOf("rel/2/?") >= 0)
+  else if (topic.lastIndexOf("rel/2?") >= 0)
   {
     client.publish(topic,String(digitalRead(relay2)));
     return;
   }
-  else if (topic.lastIndexOf("rel/3/?") >= 0)
+  else if (topic.lastIndexOf("rel/3?") >= 0)
   {
     client.publish(topic,String(digitalRead(relay3)));
     return;
   }
-  else if (topic.lastIndexOf("rel/4/?") >= 0)
+  else if (topic.lastIndexOf("rel/4?") >= 0)
   {
     client.publish(topic,String(digitalRead(relay4)));
     return;
@@ -311,7 +327,7 @@ void setup()
     while(!(bool)digitalRead(digital_input))
       needConfigPortal = true;
     
-    deviceNameFull = deviceName;
+    deviceNameFull = MODELNAME;
     deviceNameFull.concat(" V");
     deviceNameFull.concat(versionNumber);
     chipid=ESP.getEfuseMac(); //The chip ID is essentially its MAC address(length: 6 bytes).
