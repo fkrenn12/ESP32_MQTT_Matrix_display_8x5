@@ -5,9 +5,9 @@
 #define FORCE_CONFIG_PORTAL   0
 #define DEBUG                 0
 #define versionNumber         "1.0.0"
-#define MODELNAME             "ESP32-R4C"
+#define MODELNAME             "ESP32-RGB5X8"
 #define MANUFACTORER          "HTL-ET"
-#define DEVICETYPE            "RELAY Controller"
+#define DEVICETYPE            "RGB5x8 Display"
 #define BAUDRATE              9600
 
 // ------------> Time Server settings <------------------
@@ -29,11 +29,6 @@
 #define pin8 12
 #define pin9 13
 #define pin13 18
-// definitions of relay port pins ( relay shield )
-#define relay1 14
-#define relay2 27
-#define relay3 16
-#define relay4 17
 
 // definition of eeprom address
 #define eeprom_addr_relay_state   0
@@ -160,7 +155,6 @@ void messageReceived(String &topic, String &payload)
   Serial.print(topic);
   Serial.print("] ");
   Serial.println(payload);
-  bool handled = false;
   if (topic.lastIndexOf("cmd/?") >= 0)
   {
     topic.replace("cmd/?","");
@@ -193,7 +187,7 @@ void messageReceived(String &topic, String &payload)
       topic.replace("?","");
       String new_topic;
       new_topic = topic + "commands";
-      client.publish(new_topic,"['rel/1','rel/2','rel/3','rel/4','rel/1?','rel/2?','rel/3?','rel/4?']");
+      client.publish(new_topic,"{[]}");
       new_topic = topic + "manufactorer";
       client.publish(new_topic,MANUFACTORER);
       new_topic = topic + "model";
@@ -202,120 +196,7 @@ void messageReceived(String &topic, String &payload)
       client.publish(new_topic,DEVICETYPE);
       return;
   }
-  else if (topic.lastIndexOf("rel/1?") >= 0)
-  {
-    client.publish(topic,String(digitalRead(relay1)));
-    return;
-  }
-  else if (topic.lastIndexOf("rel/2?") >= 0)
-  {
-    client.publish(topic,String(digitalRead(relay2)));
-    return;
-  }
-  else if (topic.lastIndexOf("rel/3?") >= 0)
-  {
-    client.publish(topic,String(digitalRead(relay3)));
-    return;
-  }
-  else if (topic.lastIndexOf("rel/4?") >= 0)
-  {
-    client.publish(topic,String(digitalRead(relay4)));
-    return;
-  }
-  else if (topic.lastIndexOf("rel/1") >= 0)
-  {
-    payload.toLowerCase();
-    
-    if ( payload.lastIndexOf("on") >= 0 || payload.lastIndexOf("1") >= 0) 
-    {
-      Serial.println("Relais 1 ON");
-      digitalWrite(relay1,1);
-      EEPROM.writeByte(0,0xa1);
-      handled = true;
-    }
-    if ( payload.lastIndexOf("off") >= 0 || payload.lastIndexOf("0") >= 0)   
-    {
-      Serial.println("Relais 1 OFF");
-      digitalWrite(relay1,0);
-      EEPROM.writeByte(0,0xa0);
-      handled = true;
-    }
-  }
-  else if (topic.lastIndexOf("rel/2") >= 0)
-  {
-    payload.toLowerCase();
-    if ( payload.lastIndexOf("on") >= 0 || payload.lastIndexOf("1") >= 0) 
-    {
-      Serial.println("Relais 2 ON");
-      digitalWrite(relay2,1);
-      EEPROM.writeByte(1,0xa3);
-      handled = true;
-    }
-    if ( payload.lastIndexOf("off") >= 0 || payload.lastIndexOf("0") >= 0)   
-    {
-      Serial.println("Relais 2 OFF");
-      digitalWrite(relay2,0);
-      EEPROM.writeByte(1,0xa2);
-      handled = true;
-    }
-  }
-  else if (topic.lastIndexOf("rel/3") >= 0)
-  {
-    payload.toLowerCase();
-    if ( payload.lastIndexOf("on") >= 0 || payload.lastIndexOf("1") >= 0) 
-    {
-      Serial.println("Relais 3 ON");
-      digitalWrite(relay3,1);
-      EEPROM.writeByte(2,0xa5);
-      handled = true;
-    }
-    if ( payload.lastIndexOf("off") >= 0 || payload.lastIndexOf("0") >= 0)   
-    {
-      Serial.println("Relais 3 OFF");
-      digitalWrite(relay3,0);
-      EEPROM.writeByte(2,0xa4);
-      handled = true;
-    }
-  }
-  else if (topic.lastIndexOf("rel/4") >= 0)
-  {
-    payload.toLowerCase();
-    if ( payload.lastIndexOf("on") >= 0 || payload.lastIndexOf("1") >= 0) 
-    {
-      Serial.println("Relais 4 ON");
-      digitalWrite(relay4,1);
-      EEPROM.writeByte(3,0xa9);
-      handled = true;
-    }
-    if ( payload.lastIndexOf("off") >= 0 || payload.lastIndexOf("0") >= 0)   
-    {
-      Serial.println("Relais 4 OFF");
-      digitalWrite(relay4,0);
-      EEPROM.writeByte(3,0xa8);
-      handled = true;
-    }
-  }
-
-  if (handled)
-  {
-      Serial.println("HANDLED");
-      Serial.println(topic);
-      client.publish(topic,"ACCEPTED");
-      EEPROM.commit();
-  }
-  else
-  {
-      Serial.println("NOT HANDLED");
-      client.publish(topic,"ERROR");
-      return;
-  }
   String _topic    = topic_root + "rep/" + String(accessnumber); 
-  String _payload  = "{'status':{'rel':{'1':'{{REL1}}', '2':'{{REL2}}', '3':'{{REL3}}', '4':'{{REL4}}'}}}";
-  _payload.replace("{{REL1}}", String(digitalRead(relay1)));
-  _payload.replace("{{REL2}}", String(digitalRead(relay2)));
-  _payload.replace("{{REL3}}", String(digitalRead(relay3)));
-  _payload.replace("{{REL4}}", String(digitalRead(relay4)));
-  client.publish(_topic, _payload);
 }
 //--------------------------------------------
 void setup() 
@@ -348,16 +229,6 @@ void setup()
     pinMode(led_red, OUTPUT);
     digitalWrite(led_red, 0);
     digitalWrite(led_green, 0);
-    // configre relay pins
-    pinMode(relay1, OUTPUT); 
-    pinMode(relay2, OUTPUT);
-    pinMode(relay3, OUTPUT);
-    pinMode(relay4, OUTPUT);
-    delay(100);
-    digitalWrite(relay1,0);
-    digitalWrite(relay2,0);
-    digitalWrite(relay3,0);
-    digitalWrite(relay4,0);
    
     // reading the config from eeprom
     EEPROM.begin(255);
@@ -396,28 +267,6 @@ void setup()
     Serial.println(szt_mqtt_pass);
     Serial.print("MQTT-ROOT: ");
     Serial.println(szt_mqtt_root);
-
-    // reading the saved relay states and switch the relays to the saved state
-    for (int i=0; i < 4; i++)
-    {
-      char eebyte;
-      eebyte = EEPROM.readByte(i);
-      if ((eebyte & 0xF0)  != 0xa0) continue;  // not a valid byte
-      eebyte = eebyte & 0x0F;   // clear the validation nibble
-      switch(eebyte)
-      {
-        case 0: digitalWrite(relay1,0); break;
-        case 1: digitalWrite(relay1,1); break;
-        case 2: digitalWrite(relay2,0); break;
-        case 3: digitalWrite(relay2,1); break;
-        case 4: digitalWrite(relay3,0); break;
-        case 5: digitalWrite(relay3,1); break;
-        case 8: digitalWrite(relay4,0); break;
-        case 9: digitalWrite(relay4,1); break;
-        default: break;
-      }
-      delay(50);
-    }
 
     do
     {    
@@ -544,13 +393,6 @@ void loop()
   if ((millis() - timer_ms) > 1000)
   {
     timer_ms = millis();
-    String topic    = topic_root + "rep/" + String(accessnumber); 
-    String payload  = "{'status':{'rel':{'1':'{{REL1}}', '2':'{{REL2}}', '3':'{{REL3}}', '4':'{{REL4}}'}}}";
-    payload.replace("{{REL1}}", String(digitalRead(relay1)));
-    payload.replace("{{REL2}}", String(digitalRead(relay2)));
-    payload.replace("{{REL3}}", String(digitalRead(relay3)));
-    payload.replace("{{REL4}}", String(digitalRead(relay4)));
-    client.publish(topic, payload); 
   }
 }
 //callback que indica que o ESP entrou no modo AP
