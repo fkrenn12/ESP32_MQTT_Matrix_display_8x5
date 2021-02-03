@@ -9,7 +9,6 @@ LED_Matrix::LED_Matrix(int rows, int cols, Adafruit_NeoPixel& leds) // construct
   number_of_rows = rows;
   number_of_pixels = cols * rows; 
   _leds = leds;
-  _doc = new DynamicJsonDocument(1024);
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -80,9 +79,16 @@ void LED_Matrix::handle_mqtt_message(String topic, String payload, MQTTClient &c
     // we remove the * for easier following parsing
     if (show) topic.replace("*","");
 
+     // ------------------------------------------
+    if (topic.lastIndexOf("/setbright/") >= 0)
     // ------------------------------------------
-    if (topic.lastIndexOf("/setpixel_rgb/") >= 0)
-    // ------------------------------------------
+    {     
+        _leds.setBrightness(payload.toInt());    
+    }
+    
+    // -----------------------------------------------
+    else if (topic.lastIndexOf("/setpixel_rgb/") >= 0)
+    // -----------------------------------------------
     {     
         if (!is_valid_ascii_rgb(payload)) return;
         int index = topic.lastIndexOf("/");
@@ -114,10 +120,8 @@ void LED_Matrix::handle_mqtt_message(String topic, String payload, MQTTClient &c
         int commaindex = fill.lastIndexOf(",");
         int count = fill.substring(commaindex + 1).toInt();
         int start = fill.substring(0,commaindex).toInt();
-        Serial.println(String(start) + " " +String(count));
         for (int pixel = start; pixel < number_of_pixels; pixel++)
         {
-            Serial.println(String(pixel));
             _leds.setPixelColor(pixel, ascii_hsv_to_rgb(payload));         
             count--;
             if (!count) break;
@@ -167,7 +171,10 @@ void LED_Matrix::begin( void )
 // ---------------------------------------------------------------------------------------------------------------------
 {
     _leds.begin();
-    _leds.setBrightness(30);
-    _leds.setPixelColor(0, 20000); // Set pixel 'c' to value 'color'
+    _leds.setBrightness(50);
+    _leds.setPixelColor(0, ascii_hsv_to_rgb("ffffff")); 
+    _leds.show();
+    delay(1000);
+    _leds.clear();
     _leds.show();
 }

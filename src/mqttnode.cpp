@@ -1,10 +1,4 @@
 #include <mqttnode.h>
-// organazoer
-// concentrator
-// MQTTagent
-// agent
-// MQTTmagic
-// MQTT
 
 // Member functions definitions including constructor
 // ---------------------------------------------------------------------------------------------------------------------
@@ -12,7 +6,6 @@ MQTTNode::MQTTNode(const char* root, const char* manufactorer, const char* model
 // ---------------------------------------------------------------------------------------------------------------------
 {
     uint64_t chipid = ESP.getEfuseMac(); //The chip ID is essentially its MAC address(length: 6 bytes).
-    _accessnumber = ((unsigned int)chipid % 1000) + 8000;
     _accessnumber = (uint16_t)(chipid>>32);
     _accessnumber %= 1000;
     _accessnumber += 8000;
@@ -49,7 +42,7 @@ void MQTTNode::handle_mqtt_message(String topic, String payload, MQTTClient& cli
             String new_topic;
             // TODO: JSON String for 
             new_topic = topic + "commands";
-            client.publish(new_topic,"{['setpixel_rgb','setpixel_hsv']}");
+            client.publish(new_topic,_commandlist);
             new_topic = topic + "manufactorer";
             client.publish(new_topic,_manufactorer);
             new_topic = topic + "model";
@@ -91,6 +84,15 @@ void MQTTNode::set_root(String root)
     _root = root;
    _root.trim();
    if (!_root.endsWith("/")) _root = _root + "/";
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+void MQTTNode::set_commandlist(String commandlist)
+// ---------------------------------------------------------------------------------------------------------------------
+{
+    commandlist.trim();
+    if (commandlist.startsWith("{") &&  commandlist.endsWith("}"))
+        _commandlist = commandlist;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
