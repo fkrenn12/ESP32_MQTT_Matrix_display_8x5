@@ -322,6 +322,7 @@ void setup()
    
     client.onMessage(messageReceived); 
     node.set_root(mqtt_root);
+    node.set_commandlist("[\"setpixel_rgb\",\"setpixel_hsv\"]");
     node.subscribe(client); 
 }
 

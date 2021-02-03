@@ -18,7 +18,7 @@ bool LED_Matrix::is_valid_ascii_rgb(String ascii_rgb)
     bool valid = false;
     // check chars
     ascii_rgb.toLowerCase();
-    // TODO: checking valid asii chars
+    // TODO: checking valid ascii chars
     // check length
     if (ascii_rgb.length() == 6 ) valid = true;
     return(valid);
@@ -31,7 +31,7 @@ bool LED_Matrix::is_valid_ascii_hsv(String ascii_hsv)
     bool valid = false;
     // check chars
     ascii_hsv.toLowerCase();
-    // TODO: checking valid asii chars
+    // TODO: checking valid ascii chars
     // check length
     if ((ascii_hsv.length() == 6 ) || (ascii_hsv.length() == 8 ))  valid = true;
     return(valid);
@@ -146,9 +146,14 @@ void LED_Matrix::handle_mqtt_message(String topic, String payload, MQTTClient &c
         DeserializationError error = deserializeJson(doc, payload); 
         if (!error)  
         {           
-            if (doc.containsKey("test"))
+            if (doc.containsKey("brightness"))
             {
-                const char* item = doc["test"];
+                const char* item = doc["brightness"];
+                Serial.println("DESERIALIZED:" + String(item));
+            }
+            else if (doc.containsKey("setpixel_hsv"))
+            {
+                const char* item = doc["setpixel_hsv"];               
                 Serial.println("DESERIALIZED:" + String(item));
             }
             else

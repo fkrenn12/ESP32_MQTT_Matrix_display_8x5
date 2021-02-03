@@ -37,9 +37,15 @@ void MQTTNode::handle_mqtt_message(String topic, String payload, MQTTClient& cli
         }
         else if (topic.lastIndexOf("/?") >= 0)
         {
-            topic.replace("cmd","rep");
-            topic.replace("?","");
             String new_topic;
+            String new_payload;
+            
+            topic.replace("cmd","rep");
+            new_topic = topic;
+            new_payload = "{'commands':'" + _commandlist +"';'model':'" + _model + "'}";
+            client.publish(new_topic, new_payload);
+            topic.replace("?","");
+            
             // TODO: JSON String for 
             new_topic = topic + "commands";
             client.publish(new_topic,_commandlist);
@@ -91,7 +97,7 @@ void MQTTNode::set_commandlist(String commandlist)
 // ---------------------------------------------------------------------------------------------------------------------
 {
     commandlist.trim();
-    if (commandlist.startsWith("{") &&  commandlist.endsWith("}"))
+    if (commandlist.startsWith("[") &&  commandlist.endsWith("]"))
         _commandlist = commandlist;
 }
 
