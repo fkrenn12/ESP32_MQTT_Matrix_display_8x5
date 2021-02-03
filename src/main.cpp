@@ -9,7 +9,7 @@
 #include <EEPROM.h>
 #include <Ledmatrix.h>
 #include <Wemos_d1_r32.h>
-#include <MAQLab.h>
+#include <MQTTNode.h>
 
 #define MODELNAME             "D-RGB-8X5"
 #define MANUFACTORER          "F.Krenn-HTL-ET"
@@ -36,7 +36,7 @@
 
 Adafruit_NeoPixel leds(pixel_count, led_data_pin, NEO_GRB + NEO_KHZ800); // verified settings
 LED_Matrix display(rows_count, cols_count, leds);
-MAQLab maqlab("maqlab", MANUFACTORER, MODELNAME, DEVICETYPE, VERSION);
+MQTTNode node("maqlab", MANUFACTORER, MODELNAME, DEVICETYPE, VERSION);
 // definition of eeprom address
 #define eeprom_addr_state         0
 #define eeprom_addr_mqtt_server   eeprom_addr_state       + 4
@@ -162,8 +162,8 @@ void messageReceived(String &topic, String &payload)
 { 
   // Printing out received message on serial port
   Serial.println("Received: " + topic + " " + payload);
-  maqlab.handle_mqtt_message(topic, payload, client);
-  if (maqlab.is_message_for_this_device(topic)) 
+  node.handle_mqtt_message(topic, payload, client);
+  if (node.is_message_for_this_device(topic)) 
     display.handle_mqtt_message(topic,payload,client);
 }
 
@@ -187,8 +187,8 @@ void setup()
       delay(200);
     };
    
-    Serial.println("Devicename: " + maqlab.get_devicefullname());
-    Serial.println("Acessnumber: " + String(maqlab.get_accessnumber()));
+    Serial.println("Devicename: " + node.get_devicefullname());
+    Serial.println("Acessnumber: " + String(node.get_accessnumber()));
     // configure led pins
     pinMode(led_green, OUTPUT);
     pinMode(led_red, OUTPUT);
@@ -255,7 +255,7 @@ void setup()
         
         wifiManager.setConnectTimeout(5);
         wifiManager.setConfigPortalTimeout(500);
-        String text = "<p><h2>Accessnumber: " + String(maqlab.get_accessnumber()) + "</h2></p>";
+        String text = "<p><h2>Accessnumber: " + String(node.get_accessnumber()) + "</h2></p>";
         WiFiManagerParameter custom_text(text.c_str());
         WiFiManagerParameter custom_mqtt_server("server", "mqtt server", szt_mqtt_hostname , 30);
         WiFiManagerParameter custom_mqtt_port("port", "mqtt port", szt_mqtt_port, 13);
@@ -321,8 +321,8 @@ void setup()
     getLocalTime(&local, 10000);       // Versuche 10 s lang zu Synchronisieren 
    
     client.onMessage(messageReceived); 
-    maqlab.set_root(mqtt_root);
-    maqlab.subscribe(client); 
+    node.set_root(mqtt_root);
+    node.subscribe(client); 
 }
 
 //--------------------------------------------
@@ -349,7 +349,7 @@ void loop()
     while (!connecting_to_Wifi_and_broker());
     digitalWrite(led_green,1);
     Serial.println("Connected!!");
-    maqlab.subscribe(client);
+    node.subscribe(client);
   }
   if ((millis() - timer_ms) > 1000)
   {

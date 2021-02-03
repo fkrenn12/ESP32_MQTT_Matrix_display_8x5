@@ -1,8 +1,14 @@
-#include <maqlab.h>
+#include <mqttnode.h>
+// organazoer
+// concentrator
+// MQTTagent
+// agent
+// MQTTmagic
+// MQTT
 
 // Member functions definitions including constructor
 // ---------------------------------------------------------------------------------------------------------------------
-MAQLab::MAQLab(const char* root, const char* manufactorer, const char* model, const char* devicetype, const char* version) // constructor
+MQTTNode::MQTTNode(const char* root, const char* manufactorer, const char* model, const char* devicetype, const char* version) // constructor
 // ---------------------------------------------------------------------------------------------------------------------
 {
     uint64_t chipid = ESP.getEfuseMac(); //The chip ID is essentially its MAC address(length: 6 bytes).
@@ -18,7 +24,7 @@ MAQLab::MAQLab(const char* root, const char* manufactorer, const char* model, co
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
-void MAQLab::handle_mqtt_message(String topic, String payload, MQTTClient& client)
+void MQTTNode::handle_mqtt_message(String topic, String payload, MQTTClient& client)
 // ---------------------------------------------------------------------------------------------------------------------
 {
     if (topic.lastIndexOf("cmd/?") >= 0)
@@ -43,7 +49,7 @@ void MAQLab::handle_mqtt_message(String topic, String payload, MQTTClient& clien
             String new_topic;
             // TODO: JSON String for 
             new_topic = topic + "commands";
-            client.publish(new_topic,"{[]}");
+            client.publish(new_topic,"{['setpixel_rgb','setpixel_hsv']}");
             new_topic = topic + "manufactorer";
             client.publish(new_topic,_manufactorer);
             new_topic = topic + "model";
@@ -56,7 +62,7 @@ void MAQLab::handle_mqtt_message(String topic, String payload, MQTTClient& clien
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
-bool MAQLab::is_message_for_this_device(String &topic)
+bool MQTTNode::is_message_for_this_device(String topic)
 // ---------------------------------------------------------------------------------------------------------------------
 {
     // matching accessnumber?
@@ -65,21 +71,21 @@ bool MAQLab::is_message_for_this_device(String &topic)
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
-int MAQLab::get_accessnumber(void)
+int MQTTNode::get_accessnumber(void)
 // ---------------------------------------------------------------------------------------------------------------------
 {
     return (_accessnumber);
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
-String MAQLab::get_devicefullname(void)
+String MQTTNode::get_devicefullname(void)
 // ---------------------------------------------------------------------------------------------------------------------
 {
     return (_devicefullname);
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
-void MAQLab::set_root(String root)
+void MQTTNode::set_root(String root)
 // ---------------------------------------------------------------------------------------------------------------------
 {
     _root = root;
@@ -88,7 +94,7 @@ void MAQLab::set_root(String root)
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
-void MAQLab::subscribe(MQTTClient &client)
+void MQTTNode::subscribe(MQTTClient &client)
 // ---------------------------------------------------------------------------------------------------------------------
 {
     if (!_root.endsWith("/")) _root = _root + "/";

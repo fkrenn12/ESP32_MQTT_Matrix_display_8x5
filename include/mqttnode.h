@@ -1,20 +1,20 @@
-#ifndef _MAQLAB_H
-#define _MAQLAB_H
+#ifndef _MQTTNODE_H
+#define _MQTTNODE_H
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <MQTT.h>
 
-class MAQLab 
+class MQTTNode
 {
    private:
         int _accessnumber;
         String _manufactorer, _model, _devicetype;
         String _devicefullname, _root;
    public:
-        MAQLab(const char* root, const char* manufactorer, const char* model, const char* devicetype, const char* version); // constructor
+        MQTTNode(const char* root, const char* manufactorer, const char* model, const char* devicetype, const char* version); // constructor
         void handle_mqtt_message(String topic, String payload, MQTTClient &client);     
-        bool is_message_for_this_device(String &topic);
+        bool is_message_for_this_device(String topic);
         void set_root(String root);
         void subscribe( MQTTClient &client);
         int get_accessnumber(void);
