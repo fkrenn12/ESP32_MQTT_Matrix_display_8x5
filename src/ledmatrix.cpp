@@ -123,7 +123,7 @@ void LED_Matrix::handle_mqtt_message(String topic, String payload, MQTTClient &c
     {   
         bool is_hsv = (topic.lastIndexOf("/pixel_hsv/") >= 0);
         uint32_t  start = 0;
-        uint32_t  count = 0;
+        int32_t   count = 0;
         String pixelrange = topic.substring( topic.lastIndexOf("/") + 1 );
         int seperator_index = pixelrange.lastIndexOf(CHAR_PIXELSTART_COUNT_SEPERATOR);
         if (seperator_index > 0)
@@ -144,7 +144,7 @@ void LED_Matrix::handle_mqtt_message(String topic, String payload, MQTTClient &c
             // Serial.println("ITEM_LEN " + String(item_len));
             uint32_t stop = count;
             // is it a valid payload?
-            bool valid = (payload.length()%count == 0); // must be divide without rest
+            bool valid = (payload.length()%count == 0); // must be divided without rest
             if (is_hsv) valid = valid && ((item_len == 6) || (item_len  == 8)); // 6 or 8 at hsv
             else        valid = valid && (item_len == 6); // 6 only at rgb
             // Serial.println("VALID " + String(valid) + "is_hsv: " + String(is_hsv));
