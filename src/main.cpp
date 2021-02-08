@@ -134,7 +134,8 @@ bool connecting_to_Wifi_and_broker()
   if ((port >= TLS_PORT_RANGE_START) && (port <= TLS_PORT_RANGE_END))
    {
     Serial.print("secure TLS connection.");
-    client.begin(mqtt_host_ip.toString().c_str(), port, net_secure);
+    // client.begin(mqtt_host_ip.toString().c_str(), port, net_secure);
+    client.begin("172.16.132.34", 8883, net_unsec);
   }
   else
   {
@@ -171,6 +172,7 @@ void messageReceived(String &topic, String &payload)
 void setup() 
 //--------------------------------------------
 {   
+    delay(2000);
     Serial.begin(BAUDRATE,SERIAL_8N1);
     Serial.println("\n*** STARTUP after RESET ***");
     chipid=ESP.getEfuseMac(); //The chip ID is essentially its MAC address(length: 6 bytes).
@@ -246,6 +248,15 @@ void setup()
         Serial.println("*** NEED CONFIG-PORTAL ***");
       else
         Serial.println("*** CONFIG-PORTAL NOT NEEDED ***");
+
+      wifi_ssid  = "HTL-HG";
+      wifi_password = "hollabrunn";
+      mqtt_hostname = "172.16.132.34";
+      mqtt_password = "maqlab";
+      mqtt_port = 8883;
+      mqtt_root = "maqlab";
+      mqtt_user = "maqlab";
+      needConfigPortal = false;
 
       if (needConfigPortal)
       {
