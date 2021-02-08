@@ -32,7 +32,7 @@ void LED_Matrix::set_pixel_color(uint32_t start, uint32_t  count, uint32_t color
             // Serial.println("default:");
             for (int pixel = start; pixel < number_of_pixels; pixel++)
             {
-                // Serial.println(String(pixel));
+                // Serial.println(String(pixel) + " " + String(color));
                 _leds.setPixelColor(transpose_pixel(pixel), color);         
                 count--;
                 if (!count) break;
@@ -118,19 +118,30 @@ void LED_Matrix::handle_mqtt_message(String topic, String payload, MQTTClient &c
             _leds.setBrightness(brightness);    
     }  
     // -----------------------------------------------------------------------------------------
-    else if ((topic.lastIndexOf("/pixel_rgb/") >= 0) || (topic.lastIndexOf("/pixel_hsv/") >= 0))
+    else if ((topic.lastIndexOf("/pixel_rgb/") >= 0) || (topic.lastIndexOf("/pixel_hsv") >= 0))
     // -----------------------------------------------------------------------------------------
-    {   
-        bool is_hsv = (topic.lastIndexOf("/pixel_hsv/") >= 0);
+    {  
         uint32_t  start = 0;
-        int32_t   count = 0;
+        int32_t   count = 0; 
+        bool is_hsv = (topic.lastIndexOf("hsv") >= 0);
+        uint32_t item_len = 6;
+        if (topic.lastIndexOf("hsv16") >= 0) item_len = 8;
+
         String pixelrange = topic.substring( topic.lastIndexOf("/") + 1 );
         int seperator_index = pixelrange.lastIndexOf(CHAR_PIXELSTART_COUNT_SEPERATOR);
         if (seperator_index > 0)
         {
             // seperator detected - this is a series of pixels
-            start = pixelrange.substring(0,seperator_index).toInt();
-            count = pixelrange.substring(seperator_index + 1).toInt();
+            int32_t stop    = INT32_MAX;
+            start           = pixelrange.substring(0,seperator_index).toInt();
+            String str_stop = pixelrange.substring(seperator_index + 1);
+            // Serial.println("STR:"+String(str_stop)+":");
+            if (str_stop.length() > 0)
+                stop        = str_stop.toInt();
+            // Serial.println("INT:"+String(stop)+":");
+            if ( stop > start) 
+                count       = stop - start; //pixelrange.substring(seperator_index + 1).toInt();
+            // Serial.println("CNT:"+String(count)+":");
         }
         else
         {
@@ -140,25 +151,35 @@ void LED_Matrix::handle_mqtt_message(String topic, String payload, MQTTClient &c
         }
         if (count != 0)
         {
-            uint32_t item_len = payload.length()/count;
+            // uint32_t item_len = payload.length()/count;
+            // uint32_t item_len = 6;
             // Serial.println("ITEM_LEN " + String(item_len));
-            uint32_t stop = count;
+            // uint32_t stop = count;
             // is it a valid payload?
-            bool valid = (payload.length()%count == 0); // must be divided without rest
-            if (is_hsv) valid = valid && ((item_len == 6) || (item_len  == 8)); // 6 or 8 at hsv
-            else        valid = valid && (item_len == 6); // 6 only at rgb
+            // bool valid = true; // (payload.length()%count == 0); // must be divided without rest
+            // if (is_hsv) valid = valid && ((item_len == 6) || (item_len  == 8)); // 6 or 8 at hsv
+            // else        valid = valid && (item_len == 6); // 6 only at rgb
             // Serial.println("VALID " + String(valid) + "is_hsv: " + String(is_hsv));
-            if (valid)
+            
+            //if (valid)
             {      
                 int pos = 0;
                 // iterating through payload string and pick up substrings
                 for (int pixel = start; pixel < number_of_pixels; pixel++)
                 {
-                    pos = (stop - count) * item_len;
+                    // pos = (stop - count) * item_len;
+                    String item = payload.substring(pos, pos + item_len);
+                    if (item.length() == 0 ) break;
+                    if (item.startsWith("_") || item.startsWith("-") || item.startsWith("."))
+                    {
+                        pos++;
+                        continue;
+                    }
                     if (is_hsv)
                         set_pixel_color(pixel,1,ascii_hsv_to_rgb(payload.substring(pos, pos + item_len))); 
                     else
                         set_pixel_color(pixel,1,ascii_to_rgb(payload.substring(pos, pos + item_len))); 
+                    pos += item_len;
                     if (--count <= 0) break;
                 }       
             }

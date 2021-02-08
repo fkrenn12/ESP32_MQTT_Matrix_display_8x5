@@ -84,7 +84,7 @@ char chipid_str[13];    // 6 Bytes = 12 Chars + \0x00 = 13 Chars
 
 WiFiClient            net_unsec;
 WiFiClientSecure      net_secure;
-MQTTClient            client;
+MQTTClient            client(8096); // besser ausrechnen !!
 // prototypes
 void messageReceived(String &topic, String &payload);
 bool connecting_to_Wifi_and_broker();
