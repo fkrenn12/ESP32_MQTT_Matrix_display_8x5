@@ -107,10 +107,10 @@ void MQTTNode::subscribe(MQTTClient &client)
 {
     if (!_root.endsWith("/")) _root = _root + "/";
     String topic_root = _root;
-    client.subscribe(topic_root + "+/+/cmd/?");
-    client.subscribe(topic_root + "+/cmd/?");
-    client.subscribe(topic_root + "cmd/?");
-    client.subscribe(topic_root + "+/+/cmd/" + get_accessnumber() + "/#");
-    client.subscribe(topic_root + "+/cmd/" + get_accessnumber() + "/#");
-    client.subscribe(topic_root + "cmd/" + get_accessnumber() + "/#");
+    client.subscribe(topic_root + "+/+/cmd/?",0);
+    client.subscribe(topic_root + "+/cmd/?",0);
+    client.subscribe(topic_root + "cmd/?",0);
+    client.subscribe(topic_root + "+/+/cmd/" + get_accessnumber() + "/#",0);
+    client.subscribe(topic_root + "+/cmd/" + get_accessnumber() + "/#",0);
+    client.subscribe(topic_root + "cmd/" + get_accessnumber() + "/#",0);
 }
