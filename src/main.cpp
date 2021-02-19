@@ -10,6 +10,7 @@
 #include <Ledmatrix.h>
 #include <Wemos_d1_r32.h>
 #include <MQTTNode.h>
+#include <rom/rtc.h>
 
 #define MODELNAME             "D-RGB-8X5"
 #define MANUFACTORER          "F.Krenn-HTL-ET"
@@ -134,8 +135,8 @@ bool connecting_to_Wifi_and_broker()
   if ((port >= TLS_PORT_RANGE_START) && (port <= TLS_PORT_RANGE_END))
    {
     Serial.print("secure TLS connection.");
-    // client.begin(mqtt_host_ip.toString().c_str(), port, net_secure);
-    client.begin("172.16.132.34", 8883, net_unsec);
+    client.begin(mqtt_host_ip.toString().c_str(), port, net_secure);
+    //client.begin("172.16.132.34", 8883, net_unsec);
   }
   else
   {
@@ -171,10 +172,12 @@ void messageReceived(String &topic, String &payload)
 //--------------------------------------------
 void setup() 
 //--------------------------------------------
-{   
-    delay(2000);
+{  
+   
+    delay(200);
     Serial.begin(BAUDRATE,SERIAL_8N1);
     Serial.println("\n*** STARTUP after RESET ***");
+    Serial.println("Reason:" + String(rtc_get_reset_reason(0)));
     chipid=ESP.getEfuseMac(); //The chip ID is essentially its MAC address(length: 6 bytes).
     sprintf(chipid_str,"%04X%08X",(uint16_t)(chipid>>32),(uint32_t)chipid);
     Serial.println("MAX HEAPSIZE: " + String(ESP.getMaxAllocHeap()));
@@ -249,9 +252,9 @@ void setup()
       else
         Serial.println("*** CONFIG-PORTAL NOT NEEDED ***");
 
-      wifi_ssid  = "HTL-HG";
-      wifi_password = "hollabrunn";
-      mqtt_hostname = "172.16.132.34";
+      wifi_ssid  = "LAWIG14";
+      wifi_password = "wiesengrund14";
+      mqtt_hostname = "techfit.at";
       mqtt_password = "maqlab";
       mqtt_port = 8883;
       mqtt_root = "maqlab";
