@@ -2,15 +2,7 @@
     Target: ESP32
 */
 // -------------------------------------------------------------------------------------------
-#include <Arduino.h>
-#include <WiFiClientSecure.h>
-#include <WiFiManager.h>    
-#include <MQTT.h>
-#include <EEPROM.h>
-#include <Ledmatrix.h>
-#include <Wemos_d1_r32.h>
-#include <MQTTNode.h>
-#include <rom/rtc.h>
+#include "main.h"
 
 #define MODELNAME             "D-RGB-8X5"
 #define MANUFACTORER          "F.Krenn-HTL-ET"
@@ -38,6 +30,7 @@
 Adafruit_NeoPixel leds(pixel_count, led_data_pin, NEO_GRB + NEO_KHZ800); // verified settings
 LED_Matrix display(rows_count, cols_count, leds);
 MQTTNode node("maqlab", MANUFACTORER, MODELNAME, DEVICETYPE, VERSION);
+
 // definition of eeprom address
 #define eeprom_addr_state         0
 #define eeprom_addr_mqtt_server   eeprom_addr_state       + 4
@@ -85,20 +78,23 @@ char chipid_str[13];    // 6 Bytes = 12 Chars + \0x00 = 13 Chars
 
 WiFiClient            net_unsec;
 WiFiClientSecure      net_secure;
-MQTTClient            client(8096); // besser ausrechnen !!
+MQTTClient            mqtt(8096); // besser ausrechnen !!
+WifiMQTT              mqtt_connection(&mqtt,"LAWIG14","wiesengrund14","techfit.at",8883,"maqlab","maqlab",true);
+
 // prototypes
 void messageReceived(String &topic, String &payload);
 bool connecting_to_Wifi_and_broker();
 void configModeCallback (WiFiManager *myWiFiManager);
 void saveConfigCallback (void);
 
+/*
 //-------------------------------------------------------------------
 bool connecting_to_Wifi_and_broker()
 //-------------------------------------------------------------------
 {
   int counter = 0;
   Serial.print("WiFi Connecting.");
- 
+
   while(!WiFi.isConnected())
   {
     digitalWrite(led_green, 1);
@@ -135,8 +131,8 @@ bool connecting_to_Wifi_and_broker()
   if ((port >= TLS_PORT_RANGE_START) && (port <= TLS_PORT_RANGE_END))
    {
     Serial.print("secure TLS connection.");
-    client.begin(mqtt_host_ip.toString().c_str(), port, net_secure);
-    //client.begin("172.16.132.34", 8883, net_unsec);
+    // client.begin(mqtt_host_ip.toString().c_str(), port, net_secure);
+    client.begin("172.16.132.34", 8883, net_unsec);
   }
   else
   {
@@ -158,26 +154,48 @@ bool connecting_to_Wifi_and_broker()
   }
   return(true);
 }
+*/
+//-------------------------------------------------------------------
+void mqtt_disconnected()
+//-------------------------------------------------------------------
+{
+    Serial.println("*** DISONNECTED ***");
+}
+//-------------------------------------------------------------------
+void mqtt_connected()
+//-------------------------------------------------------------------
+{
+    Serial.println("CONNECTED :-) ");
+    mqtt.subscribe("maqlab/#",0);
+    Serial.println("Subscribed ");
+    //node.subscribe(mqtt);
+}
 //-------------------------------------------------------------------
 void messageReceived(String &topic, String &payload) 
 //-------------------------------------------------------------------
 { 
+  struct tm local;
+  getLocalTime(&local);       // Versuche 10 s lang zu Synchronisieren 
+  // Serial.println("RECEIVING");
   // Printing out received message on serial port
-  Serial.println("Received: " + topic + " " + payload);
-  node.handle_mqtt_message(topic, payload, client);
+  String time = String(local.tm_hour) + ":" + String(local.tm_min) + ":" + String(local.tm_sec);
+  Serial.println(time + " Received: " + topic + " " + payload);
+  /*
+  node.handle_mqtt_message(topic, payload, mqtt);
   if (node.is_message_for_this_device(topic)) 
-    display.handle_mqtt_message(topic,payload,client);
+    display.handle_mqtt_message(topic,payload,mqtt);
+  */
 }
 
 //--------------------------------------------
 void setup() 
 //--------------------------------------------
-{  
-   
-    delay(200);
+{   
+    // delay(2000);
+    mqtt_connection.set_onConnected(mqtt_connected);
+    mqtt_connection.set_onDisconnected(mqtt_disconnected);  
     Serial.begin(BAUDRATE,SERIAL_8N1);
     Serial.println("\n*** STARTUP after RESET ***");
-    Serial.println("Reason:" + String(rtc_get_reset_reason(0)));
     chipid=ESP.getEfuseMac(); //The chip ID is essentially its MAC address(length: 6 bytes).
     sprintf(chipid_str,"%04X%08X",(uint16_t)(chipid>>32),(uint32_t)chipid);
     Serial.println("MAX HEAPSIZE: " + String(ESP.getMaxAllocHeap()));
@@ -235,6 +253,29 @@ void setup()
     Serial.print("MQTT-ROOT: ");
     Serial.println(szt_mqtt_root);
 
+    mqtt_connection.start();
+    
+    /*
+    while (!mqtt_connection.mqtt_is_connected())
+    {
+      mqtt.loop();
+      vTaskDelay(10/portTICK_PERIOD_MS);
+    }
+    */
+    mqtt.onMessage(messageReceived);
+   
+    //return;
+    /*
+    do
+    {
+      
+      mqtt.publish("maqlab/ruby/test","ok");
+      vTaskDelay(1000/portTICK_PERIOD_MS);
+    } while (true);
+    */
+    // mqtt.publish("maqlab/ruby/test","ok");
+    
+    /*
     do
     {    
       client.disconnect();
@@ -252,9 +293,9 @@ void setup()
       else
         Serial.println("*** CONFIG-PORTAL NOT NEEDED ***");
 
-      wifi_ssid  = "LAWIG14";
-      wifi_password = "wiesengrund14";
-      mqtt_hostname = "techfit.at";
+      wifi_ssid  = "HTL-HG";
+      wifi_password = "hollabrunn";
+      mqtt_hostname = "172.16.132.34";
       mqtt_password = "maqlab";
       mqtt_port = 8883;
       mqtt_root = "maqlab";
@@ -309,7 +350,7 @@ void setup()
       }
     }
     while (!connecting_to_Wifi_and_broker());
-
+   
     digitalWrite(led_green,1);
     Serial.println("connected !!");
     // save wifi and broker credentials to EEPROM
@@ -329,32 +370,37 @@ void setup()
     EEPROM.writeString(eeprom_addr_mqtt_root+1,mqtt_root);
     EEPROM.commit();
 
-
-    struct tm local;
-    configTzTime(TZ_INFO, NTP_SERVER); // ESP32 Systemzeit mit NTP Synchronisieren
-    getLocalTime(&local, 10000);       // Versuche 10 s lang zu Synchronisieren 
-   
-    client.onMessage(messageReceived); 
-    node.set_root(mqtt_root);
-    node.set_commandlist("[\"setpixel_rgb\",\"setpixel_hsv\"]");
-    node.subscribe(client); 
+    
+    // mqtt.onMessage(messageReceived);
+    // node.set_root(mqtt_root);
+    // node.set_commandlist("[\"setpixel_rgb\",\"setpixel_hsv\"]");
+    // node.subscribe(mqtt); 
+    */
 }
 
 //--------------------------------------------
 void loop() 
 //--------------------------------------------
 {    
-  static int timer_ms = 0;
+  // static int timer_ms = 0;
   // static int counter = 0;
-  client.loop(); // must be called periodically to get incomming messages from MQTT-Broker
-  delay(10);  // <- fixes some issues with WiFi stability - only if neccessary
-  if (!client.connected() || needReconnect) // check connection status continously
+  
+  // mqtt.loop(); // must be called periodically to get incomming messages from MQTT-Broker
+  // struct tm local;
+  // getLocalTime(&local);       // Versuche 10 s lang zu Synchronisieren 
+    
+  // vTaskDelay(900/portTICK_PERIOD_MS); // <- fixes some issues with WiFi stability - only if neccessary
+  // Serial.println("TIME: " + String(local.tm_sec));
+  // detect reconnection 
+  /*
+  return;
+  if (!mqtt.connected() || needReconnect) // check connection status continously
   {
     digitalWrite(led_green,0);
     Serial.println("--> unexpected disconnection <--");
     do
     {
-      client.disconnect();
+      mqtt.disconnect();
       WiFi.disconnect();
       WiFi.mode(WIFI_OFF);
       WiFi.mode(WIFI_STA);
@@ -364,12 +410,13 @@ void loop()
     while (!connecting_to_Wifi_and_broker());
     digitalWrite(led_green,1);
     Serial.println("Connected!!");
-    node.subscribe(client);
+    node.subscribe(mqtt);
   }
   if ((millis() - timer_ms) > 1000)
   {
     timer_ms = millis();
   }
+  */
 }
 //callbacks
 //-------------------------------------------------------------------
