@@ -2,6 +2,7 @@
     Target: ESP32
 */
 // -------------------------------------------------------------------------------------------
+// #define CONFIG_FREERTOS_UNICORE
 #include "main.h"
 
 #define MODELNAME             "D-RGB-8X5"
@@ -87,74 +88,6 @@ bool connecting_to_Wifi_and_broker();
 void configModeCallback (WiFiManager *myWiFiManager);
 void saveConfigCallback (void);
 
-/*
-//-------------------------------------------------------------------
-bool connecting_to_Wifi_and_broker()
-//-------------------------------------------------------------------
-{
-  int counter = 0;
-  Serial.print("WiFi Connecting.");
-
-  while(!WiFi.isConnected())
-  {
-    digitalWrite(led_green, 1);
-    delay(100);
-    digitalWrite(led_green, 0);
-    Serial.print(".");
-    digitalWrite(led_red, 1);
-    delay(500);
-    digitalWrite(led_red, 0);
-    delay(500);
-    if (++counter > 10) return(false);
-  }
-  Serial.println("connected !!");
-  // get host ip from host name
-
-  
-  Serial.println("Resolve ip adress from hostname: " + mqtt_hostname);
-  IPAddress mqtt_host_ip;
-  
-  counter = 0;
-  while (WiFi.hostByName(mqtt_hostname.c_str(), mqtt_host_ip) != 1)
-  {
-    Serial.print(".");
-    digitalWrite(led_red, 1);
-    delay(500);
-    digitalWrite(led_red, 0);
-    delay(500);
-    if (++counter > 10) return(false);
-  }
-  Serial.println("IP-Address: " + mqtt_host_ip.toString()); 
-  Serial.print("Connecting to broker with ");
-    // we decide on the port range
-  int port = mqtt_port.toInt();
-  if ((port >= TLS_PORT_RANGE_START) && (port <= TLS_PORT_RANGE_END))
-   {
-    Serial.print("secure TLS connection.");
-    // client.begin(mqtt_host_ip.toString().c_str(), port, net_secure);
-    client.begin("172.16.132.34", 8883, net_unsec);
-  }
-  else
-  {
-    Serial.print("unsecured connection.");
-    client.begin(mqtt_host_ip.toString().c_str(), port, net_unsec);
-  }
-  
-
-  counter = 0;
-  while (!client.connect(chipid_str,mqtt_user.c_str(),mqtt_password.c_str()))
-  {
-    Serial.print("*");
-    digitalWrite(led_red, 1);
-    delay(500);
-    digitalWrite(led_red, 0);
-    delay(500);
-    counter++;
-    if (++counter > 10) return(false);
-  }
-  return(true);
-}
-*/
 //-------------------------------------------------------------------
 void mqtt_disconnected()
 //-------------------------------------------------------------------
@@ -175,7 +108,7 @@ void messageReceived(String &topic, String &payload)
 //-------------------------------------------------------------------
 { 
   struct tm local;
-  getLocalTime(&local);       // Versuche 10 s lang zu Synchronisieren 
+  getLocalTime(&local);      
   // Serial.println("RECEIVING");
   // Printing out received message on serial port
   String time = String(local.tm_hour) + ":" + String(local.tm_min) + ":" + String(local.tm_sec);
@@ -194,11 +127,14 @@ void setup()
     // delay(2000);
     mqtt_connection.set_onConnected(mqtt_connected);
     mqtt_connection.set_onDisconnected(mqtt_disconnected);  
+    
     Serial.begin(BAUDRATE,SERIAL_8N1);
     Serial.println("\n*** STARTUP after RESET ***");
+    Serial.println("CPU-Core # " + String(xTaskGetAffinity(NULL)));
     chipid=ESP.getEfuseMac(); //The chip ID is essentially its MAC address(length: 6 bytes).
     sprintf(chipid_str,"%04X%08X",(uint16_t)(chipid>>32),(uint32_t)chipid);
     Serial.println("MAX HEAPSIZE: " + String(ESP.getMaxAllocHeap()));
+    if (!InitalizeFileSystem(true)) ESP.restart();
     display.begin();
     bool needConfigPortal = false;
     pinMode(digital_input,INPUT_PULLUP);
@@ -254,26 +190,8 @@ void setup()
     Serial.println(szt_mqtt_root);
 
     mqtt_connection.start();
-    
-    /*
-    while (!mqtt_connection.mqtt_is_connected())
-    {
-      mqtt.loop();
-      vTaskDelay(10/portTICK_PERIOD_MS);
-    }
-    */
     mqtt.onMessage(messageReceived);
-   
-    //return;
-    /*
-    do
-    {
-      
-      mqtt.publish("maqlab/ruby/test","ok");
-      vTaskDelay(1000/portTICK_PERIOD_MS);
-    } while (true);
-    */
-    // mqtt.publish("maqlab/ruby/test","ok");
+
     
     /*
     do
@@ -381,42 +299,26 @@ void setup()
 //--------------------------------------------
 void loop() 
 //--------------------------------------------
-{    
-  // static int timer_ms = 0;
-  // static int counter = 0;
+{     
+  static uint32_t old_millis = millis();
   
-  // mqtt.loop(); // must be called periodically to get incomming messages from MQTT-Broker
-  // struct tm local;
-  // getLocalTime(&local);       // Versuche 10 s lang zu Synchronisieren 
-    
-  // vTaskDelay(900/portTICK_PERIOD_MS); // <- fixes some issues with WiFi stability - only if neccessary
-  // Serial.println("TIME: " + String(local.tm_sec));
-  // detect reconnection 
-  /*
-  return;
-  if (!mqtt.connected() || needReconnect) // check connection status continously
+  mqtt_connection.loop();
+  vTaskDelay(30/portTICK_PERIOD_MS);
+  if (!mqtt_connection.mqtt_is_connected())
   {
-    digitalWrite(led_green,0);
-    Serial.println("--> unexpected disconnection <--");
-    do
+    old_millis = millis();
+    vTaskDelay(30/portTICK_PERIOD_MS);
+  }
+  if (millis() - old_millis > 100)
+  {
+    old_millis = millis();
+    if (mqtt_connection.mqtt_is_connected())
     {
-      mqtt.disconnect();
-      WiFi.disconnect();
-      WiFi.mode(WIFI_OFF);
-      WiFi.mode(WIFI_STA);
-      WiFi.enableSTA(true);
-      WiFi.begin(wifi_ssid.c_str(),wifi_password.c_str());
+      mqtt.publish("maqlab/ruby/test","ok");
+      mqtt.publish("maqlab/ruby/test1","ok1");
+      mqtt.publish("maqlab/ruby/test2","ok2");
     }
-    while (!connecting_to_Wifi_and_broker());
-    digitalWrite(led_green,1);
-    Serial.println("Connected!!");
-    node.subscribe(mqtt);
   }
-  if ((millis() - timer_ms) > 1000)
-  {
-    timer_ms = millis();
-  }
-  */
 }
 //callbacks
 //-------------------------------------------------------------------

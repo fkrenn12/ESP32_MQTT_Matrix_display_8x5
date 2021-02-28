@@ -12,6 +12,7 @@ WifiMQTT::WifiMQTT( MQTTClient* client,
 // -----------------------------------------------------------------------------
 {
     // ConnectingTask*
+    _client = client;
     task = new ConnectingTask(  client,
                                 wifi_ssid, 
                                 wifi_passwd, 
@@ -22,14 +23,15 @@ WifiMQTT::WifiMQTT( MQTTClient* client,
                                 mqtt_use_tls,
                                 &net_unsec,
                                 &net_secure);
-    
+                                    
     xTaskCreatePinnedToCore(    ConnectingTask::run, 
                                 "wifi_mqtt_connect", 
                                 8092, 
                                 (void*) task, 
                                 1, // we need higher task priority than 0
                                 &taskHandle,
-                                1 );   
+                                APP_CPU_NUM); 
+      
 }; 
 // -----------------------------------------------------------------------------
 bool WifiMQTT::wifi_is_connected(void)
@@ -60,4 +62,32 @@ void WifiMQTT::start(void)
 void WifiMQTT::stop(void) 
 {
    vTaskSuspend(taskHandle);
+}
+// -----------------------------------------------------------------------------
+void WifiMQTT::loop(void) 
+{
+   task->fire_loop = true;
+}
+// -----------------------------------------------------------------------------
+bool WifiMQTT::publish(String& topic, String& payload, bool retain, int qos, unsigned int timeout_ms) 
+{
+    unsigned int start_millis = millis();
+    unsigned int timeout = 50;
+
+    if (timeout_ms > 0)
+        timeout = timeout_ms;
+
+    
+    while (true)
+    {
+        if (millis() - start_millis > timeout)
+            return (false);
+
+        if (millis() - task->last_loop_millis  > 50)
+        {
+            _client->publish(topic,payload,retain,qos);
+            return (true);
+        }
+        vTaskSwitchContext();
+    }
 }
