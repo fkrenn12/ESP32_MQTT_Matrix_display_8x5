@@ -27,7 +27,7 @@
 #define NTP_SERVER "de.pool.ntp.org"
 #define TZ_INFO "WEST-1DWEST-2,M3.5.0/02:00:00,M10.5.0/03:00:00" // Western European Time
 // -------------------------------------------------------------------------------------------
-
+Config config;
 Adafruit_NeoPixel leds(pixel_count, led_data_pin, NEO_GRB + NEO_KHZ800); // verified settings
 LED_Matrix display(rows_count, cols_count, leds);
 MQTTNode node("maqlab", MANUFACTORER, MODELNAME, DEVICETYPE, VERSION);
@@ -59,13 +59,7 @@ char szt_mqtt_user[32]      = "mqtt-username";
 char szt_mqtt_pass[32]      = "mqtt-password";
 char szt_mqtt_root[32]      = "mqtt-root";
 
-String wifi_ssid            = "";
-String wifi_password        = "";
-String mqtt_hostname        = ""; 
-String mqtt_port            = "";
-String mqtt_user            = ""; 
-String mqtt_password        = ""; 
-String mqtt_root            = "";
+
 
 // String deviceNameFull;
 // String topic_root = mqtt_root + "/";  
@@ -134,7 +128,10 @@ void setup()
     chipid=ESP.getEfuseMac(); //The chip ID is essentially its MAC address(length: 6 bytes).
     sprintf(chipid_str,"%04X%08X",(uint16_t)(chipid>>32),(uint32_t)chipid);
     Serial.println("MAX HEAPSIZE: " + String(ESP.getMaxAllocHeap()));
-    if (!InitalizeFileSystem(true)) ESP.restart();
+    if (!InitalizeFileSystem(true)) ESP.restart();  // without file system nothing works
+    if (!existConfigFile()) createDefaultConfigFile(true);
+    
+    
     display.begin();
     bool needConfigPortal = false;
     pinMode(digital_input,INPUT_PULLUP);
@@ -154,6 +151,7 @@ void setup()
     digitalWrite(led_red, 0);
     digitalWrite(led_green, 0);
    
+    /*
     // reading the config from eeprom
     EEPROM.begin(255);
     if (EEPROM.readByte(eeprom_addr_WiFi_SSID) == 0xaa) 
@@ -177,7 +175,9 @@ void setup()
       mqtt_user.toCharArray(szt_mqtt_user,30);
     if (EEPROM.readByte(eeprom_addr_mqtt_root) == 0xaa) 
       mqtt_user.toCharArray(szt_mqtt_root,30);
-  
+    */
+    
+    
     Serial.print("MQTT-HOST: ");
     Serial.println(szt_mqtt_hostname);
     Serial.print("MQTT-PORT: ");
