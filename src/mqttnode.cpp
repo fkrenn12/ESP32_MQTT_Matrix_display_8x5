@@ -2,13 +2,14 @@
 
 // Member functions definitions including constructor
 // ---------------------------------------------------------------------------------------------------------------------
-MQTTNode::MQTTNode(const char* root, const char* manufactorer, const char* model, const char* devicetype, const char* version) // constructor
+MQTTNode::MQTTNode(WifiMQTT* mqtt,const char* root, const char* manufactorer, const char* model, const char* devicetype, const char* version) // constructor
 // ---------------------------------------------------------------------------------------------------------------------
 {
     uint64_t chipid = ESP.getEfuseMac(); //The chip ID is essentially its MAC address(length: 6 bytes).
-    _accessnumber = (uint16_t)(chipid>>32);
-    _accessnumber %= 1000;
-    _accessnumber += 8000;
+    _mqtt = mqtt;
+    _accessnumber = (uint32_t)(chipid);
+    _accessnumber %= 100000;
+    _accessnumber += 800000;
     _manufactorer = manufactorer;
     _model = model;
     _devicetype = devicetype;
@@ -17,14 +18,14 @@ MQTTNode::MQTTNode(const char* root, const char* manufactorer, const char* model
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
-void MQTTNode::handle_mqtt_message(String topic, String payload, MQTTClient& client)
+bool MQTTNode::handle_standard_commands(String topic, String payload)
 // ---------------------------------------------------------------------------------------------------------------------
 {
     if (topic.lastIndexOf("cmd/?") >= 0)
     {
         topic.replace("cmd/?","rep/");
-        client.publish(topic + _devicefullname + "/accessnumber",String(_accessnumber));
-        return;
+        _mqtt->client->publish(topic + _devicefullname + "/accessnumber",String(_accessnumber));
+        return(true);
     }
     if (is_message_for_this_device(topic))
     {
@@ -32,8 +33,8 @@ void MQTTNode::handle_mqtt_message(String topic, String payload, MQTTClient& cli
         if (topic.lastIndexOf("/echo") >= 0)
         {
             topic.replace("cmd","rep");
-            client.publish(topic,payload);
-            return;
+            _mqtt->client->publish(topic,payload);
+            return(true);
         }
         else if (topic.lastIndexOf("/?") >= 0)
         {
@@ -43,21 +44,22 @@ void MQTTNode::handle_mqtt_message(String topic, String payload, MQTTClient& cli
             topic.replace("cmd","rep");
             new_topic = topic;
             new_payload = "{'commands':'" + _commandlist +"';'model':'" + _model + "'}";
-            client.publish(new_topic, new_payload);
+            _mqtt->client->publish(new_topic, new_payload);
             topic.replace("?","");
             
             // TODO: JSON String for 
             new_topic = topic + "commands";
-            client.publish(new_topic,_commandlist);
+            _mqtt->client->publish(new_topic,_commandlist);
             new_topic = topic + "manufactorer";
-            client.publish(new_topic,_manufactorer);
+            _mqtt->client->publish(new_topic,_manufactorer);
             new_topic = topic + "model";
-            client.publish(new_topic,_model);
+            _mqtt->client->publish(new_topic,_model);
             new_topic = topic + "devicetype";
-            client.publish(new_topic,_devicetype);
-            return;
+            _mqtt->client->publish(new_topic,_devicetype);
+            return(true);
         }
     }
+    return(false);
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -102,15 +104,15 @@ void MQTTNode::set_commandlist(String commandlist)
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
-void MQTTNode::subscribe(MQTTClient &client)
+void MQTTNode::subscribe(void)
 // ---------------------------------------------------------------------------------------------------------------------
 {
     if (!_root.endsWith("/")) _root = _root + "/";
     String topic_root = _root;
-    client.subscribe(topic_root + "+/+/cmd/?",0);
-    client.subscribe(topic_root + "+/cmd/?",0);
-    client.subscribe(topic_root + "cmd/?",0);
-    client.subscribe(topic_root + "+/+/cmd/" + get_accessnumber() + "/#",0);
-    client.subscribe(topic_root + "+/cmd/" + get_accessnumber() + "/#",0);
-    client.subscribe(topic_root + "cmd/" + get_accessnumber() + "/#",0);
+    _mqtt->subscribe(topic_root + "+/+/cmd/?",0,100);
+    _mqtt->subscribe(topic_root + "+/cmd/?",0,100);
+    _mqtt->subscribe(topic_root + "cmd/?",0,100);
+    _mqtt->subscribe(topic_root + "+/+/cmd/" + get_accessnumber() + "/#",0,100);
+    _mqtt->subscribe(topic_root + "+/cmd/" + get_accessnumber() + "/#",0,100);
+    _mqtt->subscribe(topic_root + "cmd/" + get_accessnumber() + "/#",0,100);
 }

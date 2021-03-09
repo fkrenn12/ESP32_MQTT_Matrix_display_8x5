@@ -3,23 +3,25 @@
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
-#include <MQTT.h>
+#include <wifi_mqtt.h>
 
 class MQTTNode
 {
    private:
-        int _accessnumber;
+        uint32_t _accessnumber;
         String _manufactorer, _model, _devicetype;
         String _devicefullname, _root;
         String _commandlist;
         DynamicJsonDocument * _doc;
+        WifiMQTT* _mqtt;
+
    public:
-        MQTTNode(const char* root, const char* manufactorer, const char* model, const char* devicetype, const char* version); // constructor
-        void handle_mqtt_message(String topic, String payload, MQTTClient &client);     
+        MQTTNode(WifiMQTT* mqtt, const char* root, const char* manufactorer, const char* model, const char* devicetype, const char* version); // constructor
+        bool handle_standard_commands(String topic, String payload);    
         bool is_message_for_this_device(String topic);
         void set_root(String root);
         void set_commandlist(String commandlist);
-        void subscribe( MQTTClient &client);
+        void subscribe( void);
         int get_accessnumber(void);
         String get_devicefullname(void);
 };
