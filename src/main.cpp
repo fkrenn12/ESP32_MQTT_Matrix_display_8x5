@@ -4,17 +4,21 @@
 // -------------------------------------------------------------------------------------------
 // #define CONFIG_FREERTOS_UNICORE
 #include "main.h"
+#define DEBUG                 0
 
-#define MODELNAME             "D-RGB-8X5"
-#define MANUFACTORER          "F.Krenn-HTL-ET"
-#define DEVICETYPE            "Display-RGB-8x5"
-#define VERSION               "1.0.0"
+#define NODE_ROOT                 "maqlab"
+#define NODE_MODELNAME             "D-RGB-8X5"
+#define NODE_MANUFACTORER          "F.Krenn-HTL-ET"
+#define NODE_DEVICETYPE            "Display-RGB-8x5"
+#define NODE_VERSION               "1.0.0"
 
 #define FORCE_CONFIG_PORTAL   0
-#define DEBUG                 0
 #define BAUDRATE              9600
-#define TLS_PORT_RANGE_START  8000
-#define TLS_PORT_RANGE_END    8999      
+   
+
+#define led_wifi                arduino_pin2
+#define led_mqtt                arduino_pin3
+#define force_config_portal_pin arduino_pin12
 
 // LED Matrix configuration
 // 40 Pixels / Pin#13 @ Wemos d1 R32 / 2812Shield
@@ -24,63 +28,19 @@
 #define pixel_count rows_count * cols_count
 
 // ------------> Time Server settings <------------------
-#define NTP_SERVER "de.pool.ntp.org"
-#define TZ_INFO "WEST-1DWEST-2,M3.5.0/02:00:00,M10.5.0/03:00:00" // Western European Time
+#define NTP_SERVER           "de.pool.ntp.org"
+#define TZ_INFO              "WEST-1DWEST-2,M3.5.0/02:00:00,M10.5.0/03:00:00" // Western European Time
 // -------------------------------------------------------------------------------------------
-Config config;
+Config    config;
 Adafruit_NeoPixel leds(pixel_count, led_data_pin, NEO_GRB + NEO_KHZ800); // verified settings
 LED_Matrix display(rows_count, cols_count, leds);
-MQTTNode node("maqlab", MANUFACTORER, MODELNAME, DEVICETYPE, VERSION);
-
-// definition of eeprom address
-#define eeprom_addr_state         0
-#define eeprom_addr_mqtt_server   eeprom_addr_state       + 4
-#define eeprom_addr_mqtt_port     eeprom_addr_mqtt_server + 32
-#define eeprom_addr_mqtt_user     eeprom_addr_mqtt_port   + 15
-#define eeprom_addr_mqtt_pass     eeprom_addr_mqtt_user   + 32
-#define eeprom_addr_chipid        eeprom_addr_mqtt_pass   + 32
-#define eeprom_addr_WiFi_SSID     eeprom_addr_chipid      + 32
-#define eeprom_addr_WiFi_pass     eeprom_addr_WiFi_SSID   + 32
-#define eeprom_addr_mqtt_root     eeprom_addr_WiFi_pass   + 32
-//#define eeprom_addr_mqtt_tls      eeprom_addr_mqtt_root   + 32
-
-#define led_green arduino_pin2
-#define led_red   arduino_pin3
-#define digital_input arduino_pin12
-
-// -----------------------------------------
-//            global variables
-// -----------------------------------------
-// default values
-char szt_mqtt_hostname[32]  = "mqtt-host";
-char szt_mqtt_ip[32]        = "0.0.0.0";
-char szt_mqtt_port[15]      = "mqtt-port";
-char szt_mqtt_user[32]      = "mqtt-username";
-char szt_mqtt_pass[32]      = "mqtt-password";
-char szt_mqtt_root[32]      = "mqtt-root";
-
-
-
-// String deviceNameFull;
-// String topic_root = mqtt_root + "/";  
-boolean needReconnect = false;
-
-// -----------------------------------------
-// get a Unique ID ( we use the mac-address )
-// -----------------------------------------
-uint64_t chipid;
-char chipid_str[13];    // 6 Bytes = 12 Chars + \0x00 = 13 Chars
-
-WiFiClient            net_unsec;
-WiFiClientSecure      net_secure;
-MQTTClient            mqtt(8096); // besser ausrechnen !!
-WifiMQTT              mqtt_connection(&mqtt,"LAWIG14","wiesengrund14","techfit.at",8883,"maqlab","maqlab",true);
+WifiMQTT  mqtt;
+MQTTNode  node(&mqtt, NODE_ROOT , NODE_MANUFACTORER, NODE_MODELNAME, NODE_DEVICETYPE, NODE_VERSION );
 
 // prototypes
-void messageReceived(String &topic, String &payload);
-bool connecting_to_Wifi_and_broker();
-void configModeCallback (WiFiManager *myWiFiManager);
-void saveConfigCallback (void);
+void mqtt_message(String &topic, String &payload);
+void mqtt_disconnected(void);
+void mqtt_connected(void);
 
 //-------------------------------------------------------------------
 void mqtt_disconnected()
@@ -92,208 +52,81 @@ void mqtt_disconnected()
 void mqtt_connected()
 //-------------------------------------------------------------------
 {
-    Serial.println("CONNECTED :-) ");
-    mqtt.subscribe("maqlab/#",0);
-    Serial.println("Subscribed ");
-    //node.subscribe(mqtt);
+    Serial.println("*** CONNECTED *** ");
+    node.subscribe();
 }
 //-------------------------------------------------------------------
-void messageReceived(String &topic, String &payload) 
+void mqtt_message(String &topic, String &payload) 
 //-------------------------------------------------------------------
 { 
   struct tm local;
   getLocalTime(&local);      
-  // Serial.println("RECEIVING");
-  // Printing out received message on serial port
   String time = String(local.tm_hour) + ":" + String(local.tm_min) + ":" + String(local.tm_sec);
   Serial.println(time + " Received: " + topic + " " + payload);
-  /*
-  node.handle_mqtt_message(topic, payload, mqtt);
-  if (node.is_message_for_this_device(topic)) 
-    display.handle_mqtt_message(topic,payload,mqtt);
-  */
+  
+  if (!node.handle_standard_commands(topic, payload) && node.is_message_for_this_device(topic)) 
+  {
+    
+    // Code to pass on 
+    display.handle_mqtt_message(&mqtt, topic, payload);
+    Serial.println(" OHH, message for me!!");
+  }
 }
 
 //--------------------------------------------
 void setup() 
 //--------------------------------------------
 {   
-    // delay(2000);
-    mqtt_connection.set_onConnected(mqtt_connected);
-    mqtt_connection.set_onDisconnected(mqtt_disconnected);  
-    
+    // pin configuration 
+    pinMode(led_wifi, OUTPUT);
+    pinMode(led_mqtt, OUTPUT);
+    pinMode(force_config_portal_pin,INPUT_PULLUP);
+    digitalWrite(led_wifi, 0);
+    digitalWrite(led_mqtt, 0);
+    // serial configuration
     Serial.begin(BAUDRATE,SERIAL_8N1);
+    Serial.setDebugOutput(true);
+    Serial.setDebugOutput(false);  // stop debug output on serial
+    // welcome 
     Serial.println("\n*** STARTUP after RESET ***");
+    Serial.println("CHIPID: " + config.chipid);
     Serial.println("CPU-Core # " + String(xTaskGetAffinity(NULL)));
-    chipid=ESP.getEfuseMac(); //The chip ID is essentially its MAC address(length: 6 bytes).
-    sprintf(chipid_str,"%04X%08X",(uint16_t)(chipid>>32),(uint32_t)chipid);
     Serial.println("MAX HEAPSIZE: " + String(ESP.getMaxAllocHeap()));
-    if (!InitalizeFileSystem(true)) ESP.restart();  // without file system nothing works
-    if (!existConfigFile()) createDefaultConfigFile(true);
-    
-    
-    display.begin();
-    bool needConfigPortal = false;
-    pinMode(digital_input,INPUT_PULLUP);
-    delay(10);
-    needConfigPortal = !(bool)digitalRead(digital_input);
-    while(!(bool)digitalRead(digital_input))
-    {
-      Serial.println("Remove Wire");
-      delay(200);
-    };
-   
     Serial.println("Devicename: " + node.get_devicefullname());
     Serial.println("Acessnumber: " + String(node.get_accessnumber()));
-    // configure led pins
-    pinMode(led_green, OUTPUT);
-    pinMode(led_red, OUTPUT);
-    digitalWrite(led_red, 0);
-    digitalWrite(led_green, 0);
-   
-    /*
-    // reading the config from eeprom
-    EEPROM.begin(255);
-    if (EEPROM.readByte(eeprom_addr_WiFi_SSID) == 0xaa) 
-      wifi_ssid        = EEPROM.readString(eeprom_addr_WiFi_SSID+1);
-    if (EEPROM.readByte(eeprom_addr_WiFi_pass) == 0xaa) 
-      wifi_password    = EEPROM.readString(eeprom_addr_WiFi_pass+1);
 
-    mqtt_hostname    = EEPROM.readString(eeprom_addr_mqtt_server+1);
-    mqtt_port        = EEPROM.readString(eeprom_addr_mqtt_port+1);
-    mqtt_user        = EEPROM.readString(eeprom_addr_mqtt_user+1);
-    mqtt_password    = EEPROM.readString(eeprom_addr_mqtt_pass+1);
-    mqtt_root        = EEPROM.readString(eeprom_addr_mqtt_root+1);
-   
-    if (EEPROM.readByte(eeprom_addr_mqtt_server) == 0xaa) 
-      mqtt_hostname.toCharArray(szt_mqtt_hostname,30);
-    if (EEPROM.readByte(eeprom_addr_mqtt_port) == 0xaa) 
-      mqtt_port.toCharArray(szt_mqtt_port,8);
-    if (EEPROM.readByte(eeprom_addr_mqtt_pass) == 0xaa) 
-      mqtt_password.toCharArray(szt_mqtt_pass,30);
-    if (EEPROM.readByte(eeprom_addr_mqtt_user) == 0xaa) 
-      mqtt_user.toCharArray(szt_mqtt_user,30);
-    if (EEPROM.readByte(eeprom_addr_mqtt_root) == 0xaa) 
-      mqtt_user.toCharArray(szt_mqtt_root,30);
-    */
-    
-    
-    Serial.print("MQTT-HOST: ");
-    Serial.println(szt_mqtt_hostname);
-    Serial.print("MQTT-PORT: ");
-    Serial.println(szt_mqtt_port);
-    Serial.print("MQTT-USER: ");
-    Serial.println(szt_mqtt_user);
-    Serial.print("MQTT-PASSWD: ");
-    Serial.println(szt_mqtt_pass);
-    Serial.print("MQTT-ROOT: ");
-    Serial.println(szt_mqtt_root);
-
-    mqtt_connection.start();
-    mqtt.onMessage(messageReceived);
-
-    
-    /*
-    do
-    {    
-      client.disconnect();
-      WiFi.disconnect();
-      WiFi.mode(WIFI_OFF);
-      WiFi.mode(WIFI_STA);
-      WiFi.enableSTA(true);
-      Serial.println("WiFi-SSID: " + wifi_ssid);
-      #if (FORCE_CONFIG_PORTAL == 1)
-        needConfigPortal = true;
-      #endif
-      
-      if (needConfigPortal)
-        Serial.println("*** NEED CONFIG-PORTAL ***");
-      else
-        Serial.println("*** CONFIG-PORTAL NOT NEEDED ***");
-
-      wifi_ssid  = "HTL-HG";
-      wifi_password = "hollabrunn";
-      mqtt_hostname = "172.16.132.34";
-      mqtt_password = "maqlab";
-      mqtt_port = 8883;
-      mqtt_root = "maqlab";
-      mqtt_user = "maqlab";
-      needConfigPortal = false;
-
-      if (needConfigPortal)
-      {
-        digitalWrite(led_red, 1);
-        WiFiManager wifiManager;
-        //wifiManager.setCustomHeadElement("<style>html{filter: invert(100%); -webkit-filter: invert(100%);}</style>");
-        
-        wifiManager.setConnectTimeout(5);
-        wifiManager.setConfigPortalTimeout(500);
-        String text = "<p><h2>Accessnumber: " + String(node.get_accessnumber()) + "</h2></p>";
-        WiFiManagerParameter custom_text(text.c_str());
-        WiFiManagerParameter custom_mqtt_server("server", "mqtt server", szt_mqtt_hostname , 30);
-        WiFiManagerParameter custom_mqtt_port("port", "mqtt port", szt_mqtt_port, 13);
-        WiFiManagerParameter custom_mqtt_username("user", "mqtt user", szt_mqtt_user , 30);
-        WiFiManagerParameter custom_mqtt_password("pass", "mqtt pass", szt_mqtt_pass, 30);
-        WiFiManagerParameter custom_mqtt_root("root", "mqtt root", szt_mqtt_root, 30);
-        String text_tls = "<div>For secure TLS use ports 8000...8999</div>";
-        WiFiManagerParameter custom_text_tls(text_tls.c_str());    
-        wifiManager.addParameter(&custom_text);
-        wifiManager.addParameter(&custom_mqtt_server);
-        wifiManager.addParameter(&custom_mqtt_port);
-        wifiManager.addParameter(&custom_text_tls);
-        wifiManager.addParameter(&custom_mqtt_username);
-        wifiManager.addParameter(&custom_mqtt_password);
-        wifiManager.addParameter(&custom_mqtt_root);
-        wifiManager.setAPCallback(configModeCallback); 
-        wifiManager.setSaveConfigCallback(saveConfigCallback);
-        String temp_ssid = "ESP" + String(chipid_str); 
-        wifiManager.startConfigPortal(temp_ssid.c_str());
-        //read updated parameters
-        wifi_ssid      = wifiManager.getSSID();
-        wifi_password  = wifiManager.getPassword();
-        mqtt_hostname = custom_mqtt_server.getValue();
-        mqtt_port     = custom_mqtt_port.getValue();
-        mqtt_user     = custom_mqtt_username.getValue();
-        mqtt_password = custom_mqtt_password.getValue();
-        mqtt_root     = custom_mqtt_root.getValue();
+    // init filesystem and config file
+    if (!config.initialize()) ESP.restart();  // without the file system nothing will work
+    if (!config.exist())    config.create();  // create initial configuration file
+    if (!config.exist())      ESP.restart();  // without config file nothing will work too
        
-        mqtt_hostname.toLowerCase();
-            
-        digitalWrite(led_red, 0);
-        WiFi.enableAP(false);   // remove the AP from the network
-      }
-      else
-      {
-        WiFi.begin(wifi_ssid.c_str(),wifi_password.c_str());
-      }
+    // reading the input pin to force the wifi portal
+    bool needConfigPortal= !(bool)digitalRead(force_config_portal_pin);
+    while(!(bool)digitalRead(force_config_portal_pin))
+    {
+      Serial.println("Remove jumper!");
+      delay(1000);
+    };
+  
+    // start portal if pin was low and load configuration 
+    if (needConfigPortal) 
+    {
+      config.portal(config,node.get_accessnumber());
+      config.printout(config);
+      config.store(config);
     }
-    while (!connecting_to_Wifi_and_broker());
-   
-    digitalWrite(led_green,1);
-    Serial.println("connected !!");
-    // save wifi and broker credentials to EEPROM
-    EEPROM.writeByte(eeprom_addr_WiFi_SSID,0xaa);
-    EEPROM.writeString(eeprom_addr_WiFi_SSID+1,wifi_ssid);
-    EEPROM.writeByte(eeprom_addr_WiFi_pass,0xaa);
-    EEPROM.writeString(eeprom_addr_WiFi_pass+1,wifi_password);
-    EEPROM.writeByte(eeprom_addr_mqtt_pass,0xaa);
-    EEPROM.writeString(eeprom_addr_mqtt_pass+1,mqtt_password);
-    EEPROM.writeByte(eeprom_addr_mqtt_user,0xaa);
-    EEPROM.writeString(eeprom_addr_mqtt_user+1,mqtt_user);
-    EEPROM.writeByte(eeprom_addr_mqtt_server,0xaa);
-    EEPROM.writeString(eeprom_addr_mqtt_server+1,mqtt_hostname);
-    EEPROM.writeByte(eeprom_addr_mqtt_port,0xaa);
-    EEPROM.writeString(eeprom_addr_mqtt_port+1,mqtt_port);
-    EEPROM.writeByte(eeprom_addr_mqtt_root,0xaa);
-    EEPROM.writeString(eeprom_addr_mqtt_root+1,mqtt_root);
-    EEPROM.commit();
+    config.load(config);
 
+    // MQTT Broker connection start
+    mqtt.config(config);
+    mqtt.onConnected(mqtt_connected);
+    mqtt.onDisconnected(mqtt_disconnected);  
+    mqtt.onMessage(mqtt_message);
+    mqtt.start();
     
-    // mqtt.onMessage(messageReceived);
-    // node.set_root(mqtt_root);
-    // node.set_commandlist("[\"setpixel_rgb\",\"setpixel_hsv\"]");
-    // node.subscribe(mqtt); 
-    */
+    // node configuration
+    node.set_root(config.mqtt_root);
+    node.set_commandlist("[]");   
 }
 
 //--------------------------------------------
@@ -302,37 +135,16 @@ void loop()
 {     
   static uint32_t old_millis = millis();
   
-  mqtt_connection.loop();
-  vTaskDelay(30/portTICK_PERIOD_MS);
-  if (!mqtt_connection.mqtt_is_connected())
+  if (millis() - old_millis > 1000)
   {
     old_millis = millis();
-    vTaskDelay(30/portTICK_PERIOD_MS);
-  }
-  if (millis() - old_millis > 100)
-  {
-    old_millis = millis();
-    if (mqtt_connection.mqtt_is_connected())
-    {
-      mqtt.publish("maqlab/ruby/test","ok");
-      mqtt.publish("maqlab/ruby/test1","ok1");
-      mqtt.publish("maqlab/ruby/test2","ok2");
+    { 
+      //String topic = NODE_ROOT;
+      //topic.concat("/1/1/cmd/test");
+      //String payload = "0123456789";  
+      //mqtt.publish(topic,payload,false,0,100);
+      delay(100);
     }
   }
 }
-//callbacks
-//-------------------------------------------------------------------
-void configModeCallback (WiFiManager *myWiFiManager) 
-//-------------------------------------------------------------------
-{  
-  Serial.println("Entered config mode");
-  Serial.println(WiFi.softAPIP()); 
-  Serial.println(myWiFiManager->getConfigPortalSSID()); 
-}
-//-------------------------------------------------------------------
-void saveConfigCallback () 
-//-------------------------------------------------------------------
-{
-  Serial.println("Should save config");
-  Serial.println(WiFi.softAPIP());
-}
+

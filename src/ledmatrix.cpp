@@ -100,7 +100,7 @@ uint32_t LED_Matrix::ascii_hsv_to_rgb(String ascii_hsv)
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
-void LED_Matrix::handle_mqtt_message(String topic, String payload, MQTTClient &client)
+void LED_Matrix::handle_mqtt_message(WifiMQTT* mqtt, String topic, String payload)
 // ---------------------------------------------------------------------------------------------------------------------
 {
     // handle the star character "*"
