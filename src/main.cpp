@@ -111,6 +111,7 @@ void setup()
     // start portal if pin was low and load configuration 
     if (needConfigPortal) 
     {
+      config.load(config);
       config.portal(config,node.get_accessnumber());
       config.printout(config);
       config.store(config);

@@ -1,5 +1,5 @@
-#ifndef _FILESYSTEM_H
-#define _FILESYSTEM_H
+#ifndef _CONFIG_H
+#define _CONFIG_H
 
 #define     CONFIG_FILENAME "/config.json"
 #include    <Arduino.h>
@@ -26,7 +26,8 @@ class Config
         String      mqtt_password;      
         String      mqtt_root; 
         bool        auto_tls;
-        bool        tls;          
+        bool        tls;     
+             
         Config(void);
         bool initialize(void);
         bool create(void);

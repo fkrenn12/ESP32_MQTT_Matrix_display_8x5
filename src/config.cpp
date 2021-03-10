@@ -155,6 +155,7 @@ bool Config::portal(Config& config, uint32_t accessnumber)
   // wifiManager.setSaveConfigCallback(saveConfigCallback);
   String temp_ssid = "ESP" + chipid; 
   wifiManager.startConfigPortal(temp_ssid.c_str());
+  
   //read updated parameters
   config.wifi_ssid     = wifiManager.getSSID();
   config.wifi_pass     = wifiManager.getPassword();
