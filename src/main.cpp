@@ -7,10 +7,10 @@
 #define DEBUG                 0
 
 #define NODE_ROOT                 "maqlab"
-#define NODE_MODELNAME             "D-RGB-8X5"
-#define NODE_MANUFACTORER          "F.Krenn-HTL-ET"
-#define NODE_DEVICETYPE            "Display-RGB-8x5"
-#define NODE_VERSION               "1.0.0"
+#define NODE_MODELNAME            "MD85"
+#define NODE_MANUFACTORER         "Franz Krenn / ET-HTL-HL"
+#define NODE_DEVICETYPE           "RGB-Display 8x5"
+#define NODE_VERSION              "1.0.0"
 
 #define FORCE_CONFIG_PORTAL   0
 #define BAUDRATE              9600
@@ -66,10 +66,7 @@ void mqtt_message(String &topic, String &payload)
   
   if (!node.handle_standard_commands(topic, payload) && node.is_message_for_this_device(topic)) 
   {
-    
-    // Code to pass on 
-    display.handle_mqtt_message(&mqtt, topic, payload);
-    Serial.println(" OHH, message for me!!");
+    display.handle_mqtt_message(&mqtt, topic,payload);
   }
 }
 
@@ -135,17 +132,16 @@ void loop()
 //--------------------------------------------
 {     
   static uint32_t old_millis = millis();
-  
-  if (millis() - old_millis > 1000)
+  static bool toggle;
+  if (millis() - old_millis > 100)
   {
     old_millis = millis();
+    toggle = !toggle;
     { 
-      //String topic = NODE_ROOT;
-      //topic.concat("/1/1/cmd/test");
-      //String payload = "0123456789";  
-      //mqtt.publish(topic,payload,false,0,100);
-      delay(100);
+      digitalWrite(led_mqtt,( mqtt.mqtt_is_connected() || toggle ));
+      digitalWrite(led_wifi,( mqtt.wifi_is_connected() || toggle ));
     }
   }
+  delay(50);
 }
 

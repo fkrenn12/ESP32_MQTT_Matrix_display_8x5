@@ -13,7 +13,7 @@ void ConnectingTask::_mqtt_loop(void)
 WifiMQTT::WifiMQTT() // constructor 
 // -----------------------------------------------------------------------------
 {
-    client = new MQTTClient(8096); // besser ausrechnen !!
+    client = new MQTTClient(8092); // besser ausrechnen !!
     
     task = new ConnectingTask(  client,
                                 &net_unsec,

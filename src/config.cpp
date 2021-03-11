@@ -1,4 +1,8 @@
+/*
+  Author: Franz Krenn
+*/
 #include <config.h>
+
 
 // ----------------------------------------
 Config::Config(void)
@@ -9,11 +13,11 @@ Config::Config(void)
   // default config values
   wifi_ssid       = "SSID";
   wifi_pass       = "password"; 
-  mqtt_hostname   = "yourbroker.com";
+  mqtt_hostname   = "mqtt.broker.com";
   mqtt_port       = 1883;
   mqtt_user       = "user";
   mqtt_password   = "pass";
-  mqtt_root       = "user";
+  mqtt_root       = "root";
   auto_tls        = true;  // using port range to detect using TLS or not 
                            // see #define TLS_PORT_RANGE_START and TLS_PORT_RANGE_STOP
                            // in wifi_mqtt.h
@@ -151,8 +155,6 @@ bool Config::portal(Config& config, uint32_t accessnumber)
   wifiManager.addParameter(&custom_mqtt_username);
   wifiManager.addParameter(&custom_mqtt_password);
   wifiManager.addParameter(&custom_mqtt_root);
-  // wifiManager.setAPCallback(configModeCallback); 
-  // wifiManager.setSaveConfigCallback(saveConfigCallback);
   String temp_ssid = "ESP" + chipid; 
   wifiManager.startConfigPortal(temp_ssid.c_str());
   
